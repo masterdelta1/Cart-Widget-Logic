@@ -1,0 +1,17 @@
+Fall through gracefully now, make it configurable later — don't block on building per-store config today. Reasoning: product_type is free text the merchant sets in Shopify admin with zero standardization — you will never get reliable exact-match coverage against a fixed keyword list across different stores. But building a full per-store config table + admin UI before you have a single real store is solving tomorrow's problem before today's. Sequence it:
+
+V1 (now): three-tier matching, not a flat lookup —
+
+Exact match against HOOKS keys (works for your demo store, and for any client whose product_type happens to line up)
+Normalized substring match — lowercase both sides, strip whitespace/hyphens, check if product_type or title contains a known keyword (tshirt, shirt, jean, hoodie, jacket, short, polo) mapped to the closest existing hook. This catches "men-tshirts", "Tops", "Oversized Tee", etc. without needing exact merchant taxonomy.
+Generic fallback ("We'll help you find the perfect fit for this piece") for anything unmatched — never let cart-add fail silently or show a blank/broken popup.
+
+This gets you real coverage on day one without needing merchant input at all.
+
+V2 (once you have 2-3 real clients): move HOOKS into a stores table as a JSON column keyed per client — at that point you'll have actual real product_type values from real merchants to design the schema against, instead of guessing. Don't build the config table speculatively before that.
+
+One thing to flag on the cart-listener approach, since you asked: don't rely on a single theme-specific event to detect add-to-cart — Shopify themes vary a lot here. Dawn/OS 2.0 themes and older AJAX-cart themes fire different events, and some custom themes fire none reliably. The robust, theme-agnostic approach is to intercept the /cart/add.js fetch/XHR call itself (wrap fetch/XMLHttpRequest and watch for that endpoint) rather than depending on a cart:updated custom event existing — that works regardless of theme, since virtually every Shopify add-to-cart flow hits that endpoint under the hood, even when themes differ in what events they fire afterward.
+
+Also — small flag, not architectural: remember price comes back in paise/cents, so divide by 100 before display or it'll show ₹99900 instead of ₹999.
+
+Your sequencing (config fetch → cart listener → tier timing/leave-signal → popup → capture POST) is right. Proceed.
