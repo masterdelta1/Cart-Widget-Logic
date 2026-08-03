@@ -5,7 +5,9 @@
  * API specification for the Cart-to-WhatsApp Widget platform
  * OpenAPI spec version: 0.1.0
  */
+import type { Capture } from './capture';
 
-export interface HealthStatus {
-  status: string;
+export interface CaptureList {
+  captures: Capture[];
+  total: number;
 }

@@ -6,6 +6,10 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export interface HealthStatus {
-  status: string;
-}
+export type CaptureChannel = typeof CaptureChannel[keyof typeof CaptureChannel];
+
+
+export const CaptureChannel = {
+  whatsapp: 'whatsapp',
+  sms: 'sms',
+} as const;

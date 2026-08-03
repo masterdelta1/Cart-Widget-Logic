@@ -6,6 +6,10 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export interface HealthStatus {
-  status: string;
-}
+export type StoreMode = typeof StoreMode[keyof typeof StoreMode];
+
+
+export const StoreMode = {
+  personalized: 'personalized',
+  discount: 'discount',
+} as const;

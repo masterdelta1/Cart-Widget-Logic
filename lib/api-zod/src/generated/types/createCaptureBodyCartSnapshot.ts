@@ -6,6 +6,7 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export interface HealthStatus {
-  status: string;
-}
+/**
+ * Cart items and prices at the time of capture
+ */
+export type CreateCaptureBodyCartSnapshot = { [key: string]: unknown };

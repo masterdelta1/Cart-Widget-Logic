@@ -3,13 +3,17 @@ info:
   # Do not change the title, if the title changes, the import paths will be broken
   title: Api
   version: 0.1.0
-  description: API specification
+  description: API specification for the Cart-to-WhatsApp Widget platform
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
     description: Health operations
+  - name: stores
+    description: Store management
+  - name: captures
+    description: Capture logging
 paths:
   /healthz:
     get:
@@ -24,6 +28,165 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+
+  /stores:
+    post:
+      operationId: createStore
+      tags: [stores]
+      summary: Create a new store
+      description: Creates a store record on signup. Returns the store including its UUID which acts as the install token for the widget snippet.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateStoreBody"
+      responses:
+        "201":
+          description: Store created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Store"
+        "400":
+          description: Invalid request body
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /stores/{id}/config:
+    get:
+      operationId: getStoreConfig
+      tags: [stores]
+      summary: Get widget config for a store
+      description: Called by the widget on load to fetch whatsapp_number, mode, discount_amount, and currency instead of using hardcoded JS constants.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Store config
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StoreConfig"
+        "404":
+          description: Store not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /stores/{id}:
+    patch:
+      operationId: updateStore
+      tags: [stores]
+      summary: Update store config
+      description: Update store settings from the dashboard (whatsapp number, mode, discount amount, etc.)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateStoreBody"
+      responses:
+        "200":
+          description: Updated store
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Store"
+        "400":
+          description: Invalid request body
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Store not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /captures:
+    post:
+      operationId: createCapture
+      tags: [captures]
+      summary: Log a widget capture
+      description: Widget posts here when a shopper clicks the WhatsApp or SMS link. Records cart snapshot, tier, and channel.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateCaptureBody"
+      responses:
+        "201":
+          description: Capture logged
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Capture"
+        "400":
+          description: Invalid request body
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Store not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /stores/{id}/captures:
+    get:
+      operationId: getStoreCaptures
+      tags: [captures]
+      summary: List captures for a store
+      description: Returns all captures for a store. Pass ?format=csv to get a CSV export instead of JSON.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: format
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [json, csv]
+            default: json
+      responses:
+        "200":
+          description: Captures list (JSON or CSV depending on format param)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CaptureList"
+        "404":
+          description: Store not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
 components:
   schemas:
     HealthStatus:
@@ -34,3 +197,180 @@ components:
       required:
         - status
 
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+      required:
+        - error
+
+    StoreMode:
+      type: string
+      enum: [personalized, discount]
+
+    Store:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        owner_email:
+          type: string
+          format: email
+        store_domain:
+          type: string
+        whatsapp_number:
+          type: string
+        sms_number:
+          type: string
+          nullable: true
+        mode:
+          $ref: "#/components/schemas/StoreMode"
+        discount_amount:
+          type: integer
+          nullable: true
+        currency:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+      required:
+        - id
+        - owner_email
+        - store_domain
+        - whatsapp_number
+        - mode
+        - currency
+        - created_at
+
+    StoreConfig:
+      type: object
+      description: Minimal config needed by the widget on load
+      properties:
+        whatsapp_number:
+          type: string
+        sms_number:
+          type: string
+          nullable: true
+        mode:
+          $ref: "#/components/schemas/StoreMode"
+        discount_amount:
+          type: integer
+          nullable: true
+        currency:
+          type: string
+      required:
+        - whatsapp_number
+        - mode
+        - currency
+
+    CreateStoreBody:
+      type: object
+      properties:
+        owner_email:
+          type: string
+          format: email
+        store_domain:
+          type: string
+        whatsapp_number:
+          type: string
+        sms_number:
+          type: string
+          nullable: true
+        mode:
+          $ref: "#/components/schemas/StoreMode"
+        discount_amount:
+          type: integer
+          nullable: true
+        currency:
+          type: string
+          default: "₹"
+      required:
+        - owner_email
+        - store_domain
+        - whatsapp_number
+        - mode
+
+    UpdateStoreBody:
+      type: object
+      properties:
+        whatsapp_number:
+          type: string
+        sms_number:
+          type: string
+          nullable: true
+        mode:
+          $ref: "#/components/schemas/StoreMode"
+        discount_amount:
+          type: integer
+          nullable: true
+        currency:
+          type: string
+
+    CaptureChannel:
+      type: string
+      enum: [whatsapp, sms]
+
+    Capture:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        store_id:
+          type: string
+          format: uuid
+        tier:
+          type: integer
+          minimum: 1
+          maximum: 2
+        channel:
+          $ref: "#/components/schemas/CaptureChannel"
+        cart_snapshot:
+          type: object
+          description: Cart items and prices at the time of capture
+        created_at:
+          type: string
+          format: date-time
+      required:
+        - id
+        - store_id
+        - tier
+        - channel
+        - cart_snapshot
+        - created_at
+
+    CreateCaptureBody:
+      type: object
+      properties:
+        store_id:
+          type: string
+          format: uuid
+        tier:
+          type: integer
+          minimum: 1
+          maximum: 2
+        channel:
+          $ref: "#/components/schemas/CaptureChannel"
+        cart_snapshot:
+          type: object
+          description: Cart items and prices at the time of capture
+      required:
+        - store_id
+        - tier
+        - channel
+        - cart_snapshot
+
+    CaptureList:
+      type: object
+      properties:
+        captures:
+          type: array
+          items:
+            $ref: "#/components/schemas/Capture"
+        total:
+          type: integer
+      required:
+        - captures
+        - total

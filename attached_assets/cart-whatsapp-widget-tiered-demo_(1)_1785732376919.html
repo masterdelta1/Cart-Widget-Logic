@@ -1,0 +1,385 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Demo Store — Tiered Cart Widget</title>
+<style>
+  :root {
+    --ink: #1a1a1a;
+    --paper: #faf8f5;
+    --line: #e4dfd8;
+    --accent: #1f7a4d;
+    --accent-deep: #145436;
+    --urgent: #b23a2e;
+    --muted: #7a7368;
+    --card: #ffffff;
+  }
+  * { box-sizing: border-box; }
+  body { margin:0; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif; background:var(--paper); color:var(--ink); min-height:100vh; }
+
+  .topbar { padding:14px 20px; border-bottom:1px solid var(--line); display:flex; justify-content:space-between; align-items:center; position:sticky; top:0; background:var(--paper); z-index:10; }
+  .brand { font-weight:700; font-size:16px; letter-spacing:-0.01em; }
+  .cart-badge { display:flex; align-items:center; gap:6px; font-size:12.5px; font-weight:600; border:1px solid var(--line); padding:6px 12px; border-radius:20px; background:white; }
+  .cart-dot { width:8px; height:8px; border-radius:50%; background:var(--accent); }
+
+  .cat-scroll { display:flex; gap:8px; padding:14px 16px; overflow-x:auto; border-bottom:1px solid var(--line); -webkit-overflow-scrolling:touch; }
+  .cat-scroll::-webkit-scrollbar{display:none;}
+  .cat-chip { flex-shrink:0; padding:8px 16px; border-radius:20px; border:1px solid var(--line); font-size:13px; font-weight:500; background:white; cursor:pointer; white-space:nowrap; }
+  .cat-chip.active { background:var(--ink); color:white; border-color:var(--ink); }
+
+  .grid { max-width:720px; margin:0 auto; padding:16px; display:grid; grid-template-columns:repeat(2,1fr); gap:14px; }
+  @media (min-width:520px){ .grid{ grid-template-columns:repeat(3,1fr);} }
+
+  .card { background:var(--card); border:1px solid var(--line); border-radius:12px; overflow:hidden; display:flex; flex-direction:column; }
+  .card-image { aspect-ratio:4/5; background:linear-gradient(135deg,var(--c1),var(--c2)); display:flex; align-items:flex-end; padding:10px; font-size:11px; color:rgba(255,255,255,0.85); }
+  .card-body { padding:10px 12px 12px; }
+  .card-title { font-size:13px; font-weight:600; margin:0 0 3px; line-height:1.3; }
+  .card-cat { font-size:10.5px; color:var(--muted); margin:0 0 8px; text-transform:uppercase; letter-spacing:0.04em; }
+  .card-price { font-size:13.5px; font-weight:700; margin:0 0 10px; }
+  .card-btn { width:100%; padding:9px; background:var(--ink); color:white; border:none; border-radius:7px; font-size:12.5px; font-weight:600; cursor:pointer; }
+  .card-btn.added { background:var(--accent); }
+
+  .sim-panel {
+    max-width:720px; margin:10px auto 0; padding:14px 16px;
+    border:1px dashed var(--line); border-radius:10px; background:#fff8ec;
+  }
+  .sim-title { font-size:11.5px; font-weight:700; text-transform:uppercase; letter-spacing:0.06em; color:#8a6d1f; margin:0 0 8px; }
+  .sim-row { display:flex; gap:8px; flex-wrap:wrap; }
+  .sim-btn {
+    font-size:12px; padding:8px 12px; border-radius:8px; border:1px solid #d8c48a;
+    background:white; cursor:pointer; color:#6b5217;
+  }
+  .status-line { font-size:11.5px; color:var(--muted); margin-top:10px; line-height:1.5; }
+
+  .instructions { max-width:720px; margin:16px auto 30px; padding:14px 20px 0; border-top:1px dashed var(--line); font-size:12.5px; color:var(--muted); line-height:1.6; }
+
+  .widget-overlay { position:fixed; inset:0; background:rgba(20,18,14,0.4); display:none; align-items:flex-end; justify-content:center; z-index:100; }
+  .widget-overlay.show { display:flex; animation:fadeIn .2s ease; }
+  @keyframes fadeIn{from{opacity:0;}to{opacity:1;}}
+
+  .widget-card { width:100%; max-width:480px; background:white; border-radius:20px 20px 0 0; padding:26px 22px 28px; transform:translateY(100%); animation:slideUp .32s cubic-bezier(.16,1,.3,1) forwards; box-shadow:0 -8px 40px rgba(0,0,0,.18); }
+  @keyframes slideUp{to{transform:translateY(0);}}
+
+  .widget-eyebrow { font-size:11px; letter-spacing:.1em; text-transform:uppercase; font-weight:700; margin-bottom:8px; }
+  .widget-eyebrow.tier1 { color:var(--accent-deep); }
+  .widget-eyebrow.tier2 { color:var(--urgent); }
+  .widget-title { font-size:18px; font-weight:600; line-height:1.4; margin:0 0 16px; letter-spacing:-0.01em; }
+
+  .cart-list { margin-bottom:18px; }
+  .widget-cart-item { display:flex; align-items:center; gap:12px; background:var(--paper); border:1px solid var(--line); border-radius:10px; padding:9px 12px; margin-bottom:8px; }
+  .widget-cart-thumb { width:38px; height:38px; border-radius:6px; flex-shrink:0; }
+  .widget-cart-text { font-size:12.5px; line-height:1.4; }
+  .widget-cart-text strong { display:block; font-size:13px; }
+
+  .wa-btn { display:flex; align-items:center; justify-content:center; gap:10px; width:100%; padding:15px; background:var(--accent); color:white; border:none; border-radius:10px; font-size:15px; font-weight:600; text-decoration:none; cursor:pointer; }
+  .widget-overlay.tier2-mode .wa-btn { background:var(--urgent); }
+  .sms-btn { background:#2b5faa !important; }
+  .sms-btn:active { background:#1e4680 !important; }
+  .wa-icon { width:20px; height:20px; flex-shrink:0; }
+
+  .widget-dismiss { display:block; text-align:center; margin-top:14px; font-size:13px; color:var(--muted); background:none; border:none; cursor:pointer; width:100%; padding:6px; }
+  .widget-consent-note { font-size:11px; color:var(--muted); text-align:center; margin-top:14px; line-height:1.5; }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <span class="brand">Demo Store</span>
+  <div class="cart-badge"><span class="cart-dot"></span><span id="cartCount">0 in cart</span></div>
+</div>
+
+<div class="cat-scroll">
+  <div class="cat-chip active" data-cat="All">All</div>
+  <div class="cat-chip" data-cat="T-Shirts">T-Shirts</div>
+  <div class="cat-chip" data-cat="Shirts">Shirts</div>
+  <div class="cat-chip" data-cat="Bottoms">Bottoms</div>
+  <div class="cat-chip" data-cat="Layers">Layers</div>
+  <div class="cat-chip" data-cat="Sets & Shorts">Sets & Shorts</div>
+</div>
+
+<div class="grid" id="productGrid"></div>
+
+<div class="sim-panel">
+  <p class="sim-title">Demo controls (simulate real behavior)</p>
+  <div class="sim-row">
+    <button class="sim-btn" id="simIdle">⏱ Fast-forward idle time</button>
+    <button class="sim-btn" id="simLeave">🚪 Simulate tab/app switch</button>
+    <button class="sim-btn" id="simBack">⬅ Simulate back press/swipe</button>
+    <button class="sim-btn" id="simReset">↺ Reset session</button>
+  </div>
+  <div class="sim-row" style="margin-top:8px;">
+    <button class="sim-btn" id="modeToggle">🔀 Mode: Personalized (tap to switch to Discount)</button>
+  </div>
+  <p class="status-line" id="statusLine">Add a product to begin. In a real store, Tier 1 waits ~45–60s of idle time on its own — here, tap "fast-forward" to skip the wait.</p>
+</div>
+
+<div class="instructions">
+  Real logic being tested: Tier 1 fires once, quietly, after you've been idle a bit post add-to-cart.
+  If you dismiss it, it goes silent. Tier 2 only fires if you then show a real leave-signal
+  (switching tabs/apps, or trying to close) — and only once. Convert or dismiss twice, and it stops
+  for the session. The hook text also changes once you have 2+ items in cart.
+</div>
+
+<div class="widget-overlay" id="widgetOverlay">
+  <div class="widget-card">
+    <div class="widget-eyebrow" id="widgetEyebrow">Before you go</div>
+    <p class="widget-title" id="widgetTitle"></p>
+    <div class="cart-list" id="cartList"></div>
+    <a href="#" id="waLink" class="wa-btn" target="_blank" rel="noopener">
+      <svg class="wa-icon" viewBox="0 0 24 24" fill="white"><path d="M17.6 6.32A7.85 7.85 0 0012.05 4a7.94 7.94 0 00-6.87 11.88L4 20l4.24-1.11a7.9 7.9 0 003.8.97h.01a7.94 7.94 0 007.94-7.94 7.9 7.9 0 00-2.4-5.6zm-5.55 12.2h-.01a6.6 6.6 0 01-3.36-.92l-.24-.14-2.5.66.67-2.44-.16-.25a6.6 6.6 0 01-1.01-3.5 6.62 6.62 0 0111.24-4.7 6.58 6.58 0 011.94 4.7 6.62 6.62 0 01-6.57 6.6zm3.6-4.95c-.2-.1-1.17-.58-1.35-.64-.18-.07-.31-.1-.44.1-.13.19-.5.64-.62.78-.11.13-.23.15-.42.05-.2-.1-.83-.3-1.58-.97-.58-.52-.98-1.16-1.09-1.36-.11-.19 0-.3.09-.4.09-.09.2-.23.3-.35.1-.11.13-.19.2-.32.06-.13.03-.24-.02-.34-.05-.1-.44-1.05-.6-1.44-.16-.38-.32-.33-.44-.33-.11 0-.24-.01-.37-.01a.71.71 0 00-.52.24c-.18.19-.68.66-.68 1.6 0 .95.7 1.87.79 2 .1.13 1.36 2.08 3.3 2.91.46.2.82.32 1.1.4.46.15.88.13 1.21.08.37-.05 1.17-.48 1.33-.94.16-.46.16-.85.12-.94-.05-.09-.18-.14-.38-.24z"/></svg>
+      Continue on WhatsApp
+    </a>
+    <a href="#" id="smsLink" class="wa-btn sms-btn" style="margin-top:9px;">
+      <svg class="wa-icon" viewBox="0 0 24 24" fill="white"><path d="M20 2H4a2 2 0 00-2 2v18l4-4h14a2 2 0 002-2V4a2 2 0 00-2-2zM6 9h12v2H6V9zm8 5H6v-2h8v2zm4-6H6V6h12v2z"/></svg>
+      Continue via SMS instead
+    </a>
+    <button class="widget-dismiss" id="widgetDismiss">Not now, I'll browse</button>
+    <p class="widget-consent-note" id="consentNote">Tapping "Continue on WhatsApp" opens a chat with this message pre-filled.</p>
+  </div>
+</div>
+
+<script>
+  const STORE_WHATSAPP_NUMBER = "919340420873";
+  const STORE_SMS_NUMBER = "919340420873"; // same or different number for SMS fallback
+
+  // ---- Brand configuration: adjust based on what the brand has agreed to ----
+  // A brand owner who's happy to reply personally -> mode: "personalized"
+  // A brand who only wants a flat, no-reply-needed discount -> mode: "discount"
+  const BRAND_CONFIG = {
+    mode: "personalized",     // "personalized" or "discount"
+    discountAmount: 100,      // used only when mode is "discount"
+    currency: "₹"
+  };
+  const HOOKS = {
+    "Oversized T-Shirt": "Want to make sure you pick the perfect oversized fit? We'll recommend your ideal size and matching bottoms.",
+    "Graphic T-Shirt": "We'll recommend bottoms and layering pieces that match this graphic.",
+    "Shirt": "We'll help you choose the right fit and suggest trousers or jeans that complement this shirt.",
+    "Linen Shirt": "We'll recommend the best fit and create a complete summer outfit around this linen shirt.",
+    "Jeans": "Need help choosing the right waist and fit? We'll also suggest tops that pair well with these jeans.",
+    "Cargo Pants": "We'll help you pick the right fit and recommend oversized tees or shirts that complete the look.",
+    "Hoodie": "We'll recommend the perfect size and matching joggers or cargos.",
+    "Jacket": "We'll suggest the best layering pieces and help you choose the right size.",
+    "Co-ord Set": "We'll help you choose the perfect fit and recommend accessories to complete the look.",
+    "Shorts": "We'll recommend matching tees or shirts and help you pick the best fit."
+  };
+
+  const PRODUCTS = [
+    { name:"Oversized Waffle Henley", type:"Oversized T-Shirt", cat:"T-Shirts", price:"₹999", c1:"#d9cfc0", c2:"#a4917a" },
+    { name:"Bold Graphic Tee", type:"Graphic T-Shirt", cat:"T-Shirts", price:"₹649", c1:"#1c2b4a", c2:"#2f4a7a" },
+    { name:"Classic Everyday Shirt", type:"Shirt", cat:"Shirts", price:"₹1,199", c1:"#e8e2d6", c2:"#b8a98a" },
+    { name:"Summer Linen Shirt", type:"Linen Shirt", cat:"Shirts", price:"₹1,499", c1:"#f0ead9", c2:"#c9b48e" },
+    { name:"Vintage Wash Jeans", type:"Jeans", cat:"Bottoms", price:"₹1,799", c1:"#2b3d55", c2:"#41618a" },
+    { name:"Utility Cargo Pants", type:"Cargo Pants", cat:"Bottoms", price:"₹1,599", c1:"#4a4235", c2:"#6e6350" },
+    { name:"Fleece Pullover Hoodie", type:"Hoodie", cat:"Layers", price:"₹1,699", c1:"#3a3a3a", c2:"#5c5c5c" },
+    { name:"Lightweight Overshirt Jacket", type:"Jacket", cat:"Layers", price:"₹2,299", c1:"#334033", c2:"#4d5f4d" },
+    { name:"Textured Co-ord Set", type:"Co-ord Set", cat:"Sets & Shorts", price:"₹2,499", c1:"#5a4a3a", c2:"#7d6852" },
+    { name:"Relaxed Fit Shorts", type:"Shorts", cat:"Sets & Shorts", price:"₹899", c1:"#8a8070", c2:"#b0a48f" }
+  ];
+
+  // ---- Session state ----
+  let cart = [];
+  let idleTimer = null;
+  let tier1Shown = false;
+  let tier1Dismissed = false;
+  let tier2Shown = false;
+  let converted = false;
+  const IDLE_MS = 6000; // demo speed; real deployment would use 45000-60000
+
+  const grid = document.getElementById("productGrid");
+  const statusLine = document.getElementById("statusLine");
+
+  function renderProducts(filter) {
+    grid.innerHTML = "";
+    PRODUCTS.filter(p => filter === "All" || p.cat === filter).forEach(p => {
+      const idx = PRODUCTS.indexOf(p);
+      const card = document.createElement("div");
+      card.className = "card";
+      card.innerHTML = `
+        <div class="card-image" style="--c1:${p.c1}; --c2:${p.c2}">${p.type}</div>
+        <div class="card-body">
+          <p class="card-title">${p.name}</p>
+          <p class="card-cat">${p.cat}</p>
+          <p class="card-price">${p.price}</p>
+          <button class="card-btn" data-idx="${idx}">Add to Cart</button>
+        </div>`;
+      grid.appendChild(card);
+    });
+    grid.querySelectorAll(".card-btn").forEach(btn => {
+      btn.addEventListener("click", () => addToCart(PRODUCTS[btn.dataset.idx], btn));
+    });
+  }
+
+  document.querySelectorAll(".cat-chip").forEach(chip => {
+    chip.addEventListener("click", () => {
+      document.querySelectorAll(".cat-chip").forEach(c => c.classList.remove("active"));
+      chip.classList.add("active");
+      renderProducts(chip.dataset.cat);
+    });
+  });
+
+  function addToCart(product, btn) {
+    cart.push(product);
+    document.getElementById("cartCount").textContent = `${cart.length} in cart`;
+    btn.textContent = "Added ✓";
+    btn.classList.add("added");
+    setTimeout(() => { btn.textContent = "Add to Cart"; btn.classList.remove("added"); }, 1400);
+
+    if (converted) return; // already handed off, stop nudging entirely
+
+    if (!tier1Shown) {
+      // (re)start the idle countdown — real store: 45-60s of no further activity
+      clearTimeout(idleTimer);
+      statusLine.textContent = `Cart updated (${cart.length} item${cart.length>1?'s':''}). Tier 1 idle timer running — tap "fast-forward" to skip, or wait.`;
+      idleTimer = setTimeout(() => fireTier1(), IDLE_MS);
+    } else {
+      statusLine.textContent = `Cart updated (${cart.length} item${cart.length>1?'s':''}). Tier 1 already handled this session.`;
+    }
+  }
+
+  function buildCartHtml() {
+    return cart.map(p => `
+      <div class="widget-cart-item">
+        <div class="widget-cart-thumb" style="background:linear-gradient(135deg, ${p.c1}, ${p.c2})"></div>
+        <div class="widget-cart-text"><strong>${p.name}</strong>${p.cat} · ${p.price}</div>
+      </div>`).join("");
+  }
+
+  function hookForCart() {
+    if (BRAND_CONFIG.mode === "discount") {
+      const amt = BRAND_CONFIG.currency + BRAND_CONFIG.discountAmount;
+      return cart.length === 1
+        ? `This one's just for you — ${amt} off, reserved on WhatsApp.`
+        : `Sirf iss order ke liye — ${amt} off, reserved on WhatsApp. Continue karo isse pehle ye chala jaaye.`;
+    }
+    // personalized mode
+    if (cart.length === 1) {
+      return HOOKS[cart[0].type] || "We'll help you find the perfect fit for this piece.";
+    }
+    const names = cart.map(p => p.name.split(" ").slice(-1)[0]).join(" + ");
+    return `You're building a full look (${names}) — want us to suggest one more piece to complete it, and confirm sizing for everything?`;
+  }
+
+  function waMessage(prefix) {
+    const items = cart.map(p => `${p.name} (${p.price})`).join(", ");
+    if (BRAND_CONFIG.mode === "discount") {
+      return `${prefix} I have ${cart.length > 1 ? "these items" : "this item"} in my cart: ${items}. Claiming my reserved discount.`;
+    }
+    return `${prefix} I have ${cart.length > 1 ? "these items" : "this item"} in my cart: ${items}. ${hookForCart()}`;
+  }
+
+  function openWidget(tier) {
+    const overlay = document.getElementById("widgetOverlay");
+    const eyebrow = document.getElementById("widgetEyebrow");
+    overlay.classList.remove("tier2-mode");
+
+    if (tier === 1) {
+      eyebrow.textContent = "Before you go";
+      eyebrow.className = "widget-eyebrow tier1";
+      document.getElementById("widgetTitle").textContent = hookForCart();
+      document.getElementById("waLink").href = "https://wa.me/" + STORE_WHATSAPP_NUMBER + "?text=" + encodeURIComponent(waMessage("Hi!"));
+      document.getElementById("smsLink").href = "sms:" + STORE_SMS_NUMBER + "?body=" + encodeURIComponent(waMessage("Hi!"));
+      document.getElementById("consentNote").textContent = "Tapping \"Continue on WhatsApp\" opens a chat with this message pre-filled.";
+    } else {
+      eyebrow.textContent = "Last thing before you leave";
+      eyebrow.className = "widget-eyebrow tier2";
+      overlay.classList.add("tier2-mode");
+      document.getElementById("widgetTitle").textContent = "Want us to hold your cart and send you the details on WhatsApp instead?";
+      document.getElementById("waLink").href = "https://wa.me/" + STORE_WHATSAPP_NUMBER + "?text=" + encodeURIComponent(waMessage("Hi, I was about to leave —"));
+      document.getElementById("smsLink").href = "sms:" + STORE_SMS_NUMBER + "?body=" + encodeURIComponent(waMessage("Hi, I was about to leave —"));
+      document.getElementById("consentNote").textContent = "We'll just send your cart — no spam, stop anytime.";
+    }
+    document.getElementById("cartList").innerHTML = buildCartHtml();
+    overlay.classList.add("show");
+  }
+
+  function fireTier1() {
+    if (tier1Shown || converted || cart.length === 0) return;
+    tier1Shown = true;
+    statusLine.textContent = "Tier 1 fired: soft nudge shown after idle time.";
+    openWidget(1);
+  }
+
+  function fireTier2() {
+    if (!tier1Dismissed || tier2Shown || converted || cart.length === 0) return;
+    tier2Shown = true;
+    statusLine.textContent = "Tier 2 fired: real leave-signal detected after Tier 1 was dismissed.";
+    openWidget(2);
+  }
+
+  document.getElementById("widgetDismiss").addEventListener("click", () => {
+    document.getElementById("widgetOverlay").classList.remove("show");
+    if (tier1Shown && !tier1Dismissed && !tier2Shown) {
+      tier1Dismissed = true;
+      statusLine.textContent = "Tier 1 dismissed. Widget will stay silent unless a real leave-signal happens (Tier 2, once only).";
+    } else if (tier2Shown) {
+      statusLine.textContent = "Tier 2 dismissed. Widget stays silent for the rest of this session.";
+    }
+  });
+
+  document.getElementById("widgetOverlay").addEventListener("click", (e) => {
+    if (e.target.id === "widgetOverlay") document.getElementById("widgetOverlay").classList.remove("show");
+  });
+
+  document.getElementById("waLink").addEventListener("click", () => {
+    converted = true;
+    statusLine.textContent = "Converted via WhatsApp — handed off. No more popups this session.";
+  });
+  document.getElementById("smsLink").addEventListener("click", () => {
+    converted = true;
+    statusLine.textContent = "Converted via SMS — handed off. No more popups this session.";
+  });
+
+  // ---- Real leave-signals (not simulated) ----
+  document.addEventListener("visibilitychange", () => {
+    if (document.hidden) fireTier2(); // user switched tab/app
+  });
+  document.addEventListener("mouseout", (e) => {
+    if (!e.relatedTarget && e.clientY <= 0) fireTier2(); // mouse leaving toward tab bar (desktop)
+  });
+
+  // ---- Back button / back-swipe gesture detection ----
+  // Trick: push an extra history entry so the first "back" action doesn't
+  // actually leave the page — it fires popstate instead, which we catch.
+  history.pushState({ trap: true }, "", location.href);
+  window.addEventListener("popstate", () => {
+    const shouldIntercept = tier1Dismissed && !tier2Shown && !converted && cart.length > 0;
+    if (shouldIntercept) {
+      fireTier2();
+      history.pushState({ trap: true }, "", location.href);
+    }
+  });
+
+  // ---- Demo-only simulation controls ----
+  document.getElementById("simIdle").addEventListener("click", () => {
+    clearTimeout(idleTimer);
+    fireTier1();
+  });
+  document.getElementById("simLeave").addEventListener("click", () => {
+    fireTier2();
+  });
+  document.getElementById("simBack").addEventListener("click", () => {
+    history.back(); // triggers the real popstate handler, same path as an actual back press
+  });
+  document.getElementById("simReset").addEventListener("click", () => {
+    cart = []; tier1Shown = false; tier1Dismissed = false; tier2Shown = false; converted = false;
+    clearTimeout(idleTimer);
+    document.getElementById("cartCount").textContent = "0 in cart";
+    document.getElementById("widgetOverlay").classList.remove("show");
+    statusLine.textContent = "Session reset. Add a product to begin again.";
+  });
+
+  document.getElementById("modeToggle").addEventListener("click", () => {
+    BRAND_CONFIG.mode = BRAND_CONFIG.mode === "personalized" ? "discount" : "personalized";
+    const btn = document.getElementById("modeToggle");
+    btn.textContent = BRAND_CONFIG.mode === "personalized"
+      ? "🔀 Mode: Personalized (tap to switch to Discount)"
+      : "🔀 Mode: Discount ₹" + BRAND_CONFIG.discountAmount + " (tap to switch to Personalized)";
+    statusLine.textContent = "Brand mode switched to \"" + BRAND_CONFIG.mode + "\". Add a product and let Tier 1 fire to see the new wording.";
+  });
+
+  renderProducts("All");
+</script>
+
+</body>
+</html>
