@@ -13,6 +13,22 @@ export interface ErrorResponse {
   error: string;
 }
 
+export interface SuccessResponse {
+  success: boolean;
+}
+
+export interface SignupBody {
+  owner_email: string;
+  /** @minLength 8 */
+  password: string;
+  store_domain: string;
+}
+
+export interface LoginBody {
+  owner_email: string;
+  password: string;
+}
+
 export type StoreMode = typeof StoreMode[keyof typeof StoreMode];
 
 
@@ -25,7 +41,7 @@ export interface Store {
   id: string;
   owner_email: string;
   store_domain: string;
-  whatsapp_number: string;
+  whatsapp_number?: string | null;
   sms_number?: string | null;
   mode: StoreMode;
   discount_amount?: number | null;
@@ -37,7 +53,7 @@ export interface Store {
  * Minimal config needed by the widget on load
  */
 export interface StoreConfig {
-  whatsapp_number: string;
+  whatsapp_number?: string | null;
   sms_number?: string | null;
   mode: StoreMode;
   discount_amount?: number | null;

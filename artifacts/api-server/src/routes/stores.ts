@@ -11,6 +11,7 @@ import {
   UpdateStoreBody,
   UpdateStoreResponse,
 } from "@workspace/api-zod";
+import { requireAuth, requireOwnStore } from "../lib/auth-middleware";
 
 const router: IRouter = Router();
 
@@ -91,7 +92,7 @@ router.get("/stores/:id/config", async (req, res): Promise<void> => {
  * PATCH /stores/:id
  * Update store config from the dashboard.
  */
-router.patch("/stores/:id", async (req, res): Promise<void> => {
+router.patch("/stores/:id", requireAuth, requireOwnStore, async (req, res): Promise<void> => {
   const params = UpdateStoreParams.safeParse(req.params);
   if (!params.success) {
     res.status(400).json({ error: params.error.message });

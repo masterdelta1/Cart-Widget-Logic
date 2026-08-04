@@ -13,9 +13,10 @@ export const storeModeEnum = pgEnum("store_mode", ["personalized", "discount"]);
 
 export const storesTable = pgTable("stores", {
   id: uuid("id").primaryKey().defaultRandom(),
-  ownerEmail: text("owner_email").notNull(),
+  ownerEmail: text("owner_email").notNull().unique(),
+  passwordHash: text("password_hash"),
   storeDomain: text("store_domain").notNull(),
-  whatsappNumber: text("whatsapp_number").notNull(),
+  whatsappNumber: text("whatsapp_number"),
   smsNumber: text("sms_number"),
   mode: storeModeEnum("mode").notNull().default("personalized"),
   discountAmount: integer("discount_amount"),

@@ -10,6 +10,8 @@ servers:
 tags:
   - name: health
     description: Health operations
+  - name: auth
+    description: Dashboard authentication
   - name: stores
     description: Store management
   - name: captures
@@ -28,6 +30,95 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+
+  /auth/signup:
+    post:
+      operationId: signup
+      tags: [auth]
+      summary: Create a dashboard account
+      description: Creates a store owner account and its store row in one step. Starts a session and redirects to settings.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SignupBody"
+      responses:
+        "201":
+          description: Account created and session started
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Store"
+        "400":
+          description: Invalid request body
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: Email already registered
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /auth/login:
+    post:
+      operationId: login
+      tags: [auth]
+      summary: Log in to the dashboard
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginBody"
+      responses:
+        "200":
+          description: Session started
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Store"
+        "401":
+          description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /auth/logout:
+    post:
+      operationId: logout
+      tags: [auth]
+      summary: Log out of the dashboard
+      responses:
+        "200":
+          description: Session ended
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+
+  /auth/me:
+    get:
+      operationId: getCurrentUser
+      tags: [auth]
+      summary: Get the logged-in store owner
+      responses:
+        "200":
+          description: Current store
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Store"
+        "401":
+          description: Not logged in
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
 
   /stores:
     post:
@@ -205,6 +296,42 @@ components:
       required:
         - error
 
+    SuccessResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+      required:
+        - success
+
+    SignupBody:
+      type: object
+      properties:
+        owner_email:
+          type: string
+          format: email
+        password:
+          type: string
+          minLength: 8
+        store_domain:
+          type: string
+      required:
+        - owner_email
+        - password
+        - store_domain
+
+    LoginBody:
+      type: object
+      properties:
+        owner_email:
+          type: string
+          format: email
+        password:
+          type: string
+      required:
+        - owner_email
+        - password
+
     StoreMode:
       type: string
       enum: [personalized, discount]
@@ -222,6 +349,7 @@ components:
           type: string
         whatsapp_number:
           type: string
+          nullable: true
         sms_number:
           type: string
           nullable: true
@@ -239,7 +367,6 @@ components:
         - id
         - owner_email
         - store_domain
-        - whatsapp_number
         - mode
         - currency
         - created_at
@@ -250,6 +377,7 @@ components:
       properties:
         whatsapp_number:
           type: string
+          nullable: true
         sms_number:
           type: string
           nullable: true
@@ -261,7 +389,6 @@ components:
         currency:
           type: string
       required:
-        - whatsapp_number
         - mode
         - currency
 

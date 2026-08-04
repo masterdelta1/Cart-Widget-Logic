@@ -18,6 +18,78 @@ export const HealthCheckResponse = zod.object({
 
 
 /**
+ * Creates a store owner account and its store row in one step. Starts a session and redirects to settings.
+ * @summary Create a dashboard account
+ */
+export const signupBodyPasswordMin = 8;
+
+
+
+export const SignupBody = zod.object({
+  "owner_email": zod.email(),
+  "password": zod.string().min(signupBodyPasswordMin),
+  "store_domain": zod.string()
+})
+
+export const SignupResponse = zod.object({
+  "id": zod.uuid(),
+  "owner_email": zod.email(),
+  "store_domain": zod.string(),
+  "whatsapp_number": zod.string().nullish(),
+  "sms_number": zod.string().nullish(),
+  "mode": zod.enum(['personalized', 'discount']),
+  "discount_amount": zod.int().nullish(),
+  "currency": zod.string(),
+  "created_at": zod.coerce.date()
+})
+
+
+/**
+ * @summary Log in to the dashboard
+ */
+export const LoginBody = zod.object({
+  "owner_email": zod.email(),
+  "password": zod.string()
+})
+
+export const LoginResponse = zod.object({
+  "id": zod.uuid(),
+  "owner_email": zod.email(),
+  "store_domain": zod.string(),
+  "whatsapp_number": zod.string().nullish(),
+  "sms_number": zod.string().nullish(),
+  "mode": zod.enum(['personalized', 'discount']),
+  "discount_amount": zod.int().nullish(),
+  "currency": zod.string(),
+  "created_at": zod.coerce.date()
+})
+
+
+/**
+ * @summary Log out of the dashboard
+ */
+export const LogoutResponse = zod.object({
+  "success": zod.boolean()
+})
+
+
+/**
+ * @summary Get the logged-in store owner
+ */
+export const GetCurrentUserResponse = zod.object({
+  "id": zod.uuid(),
+  "owner_email": zod.email(),
+  "store_domain": zod.string(),
+  "whatsapp_number": zod.string().nullish(),
+  "sms_number": zod.string().nullish(),
+  "mode": zod.enum(['personalized', 'discount']),
+  "discount_amount": zod.int().nullish(),
+  "currency": zod.string(),
+  "created_at": zod.coerce.date()
+})
+
+
+/**
  * Creates a store record on signup. Returns the store including its UUID which acts as the install token for the widget snippet.
  * @summary Create a new store
  */
@@ -37,7 +109,7 @@ export const CreateStoreResponse = zod.object({
   "id": zod.uuid(),
   "owner_email": zod.email(),
   "store_domain": zod.string(),
-  "whatsapp_number": zod.string(),
+  "whatsapp_number": zod.string().nullish(),
   "sms_number": zod.string().nullish(),
   "mode": zod.enum(['personalized', 'discount']),
   "discount_amount": zod.int().nullish(),
@@ -55,7 +127,7 @@ export const GetStoreConfigParams = zod.object({
 })
 
 export const GetStoreConfigResponse = zod.object({
-  "whatsapp_number": zod.string(),
+  "whatsapp_number": zod.string().nullish(),
   "sms_number": zod.string().nullish(),
   "mode": zod.enum(['personalized', 'discount']),
   "discount_amount": zod.int().nullish(),
@@ -83,7 +155,7 @@ export const UpdateStoreResponse = zod.object({
   "id": zod.uuid(),
   "owner_email": zod.email(),
   "store_domain": zod.string(),
-  "whatsapp_number": zod.string(),
+  "whatsapp_number": zod.string().nullish(),
   "sms_number": zod.string().nullish(),
   "mode": zod.enum(['personalized', 'discount']),
   "discount_amount": zod.int().nullish(),

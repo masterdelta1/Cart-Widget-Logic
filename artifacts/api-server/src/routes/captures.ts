@@ -9,6 +9,7 @@ import {
   GetStoreCapturesQueryParams,
   GetStoreCapturesResponse,
 } from "@workspace/api-zod";
+import { requireAuth, requireOwnStore } from "../lib/auth-middleware";
 
 const router: IRouter = Router();
 
@@ -64,7 +65,7 @@ router.post("/captures", async (req, res): Promise<void> => {
  * Returns all captures for a store.
  * Pass ?format=csv to get a CSV export instead of JSON.
  */
-router.get("/stores/:id/captures", async (req, res): Promise<void> => {
+router.get("/stores/:id/captures", requireAuth, requireOwnStore, async (req, res): Promise<void> => {
   const params = GetStoreCapturesParams.safeParse(req.params);
   if (!params.success) {
     res.status(400).json({ error: params.error.message });

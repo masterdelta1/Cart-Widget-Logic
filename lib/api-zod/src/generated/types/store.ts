@@ -11,7 +11,7 @@ export interface Store {
   id: string;
   owner_email: string;
   store_domain: string;
-  whatsapp_number: string;
+  whatsapp_number?: string | null;
   sms_number?: string | null;
   mode: StoreMode;
   discount_amount?: number | null;
