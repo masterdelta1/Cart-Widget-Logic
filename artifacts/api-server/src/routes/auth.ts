@@ -11,9 +11,7 @@ import {
   LogoutResponse,
   GetCurrentUserResponse,
 } from "@workspace/api-zod";
-
 const router: IRouter = Router();
-
 function toStoreResponse(store: typeof storesTable.$inferSelect) {
   return {
     id: store.id,
@@ -27,7 +25,6 @@ function toStoreResponse(store: typeof storesTable.$inferSelect) {
     created_at: store.createdAt,
   };
 }
-
 /**
  * POST /auth/signup
  * Creates a store owner account + store row in one step, then starts a session.
@@ -38,21 +35,16 @@ router.post("/auth/signup", async (req, res): Promise<void> => {
     res.status(400).json({ error: parsed.error.message });
     return;
   }
-
   const { owner_email, password, store_domain } = parsed.data;
-
   const [existing] = await db
     .select({ id: storesTable.id })
     .from(storesTable)
     .where(eq(storesTable.ownerEmail, owner_email));
-
   if (existing) {
     res.status(409).json({ error: "Email already registered" });
     return;
   }
-
   const passwordHash = await bcrypt.hash(password, 10);
-
   const [store] = await db
     .insert(storesTable)
     .values({
@@ -61,12 +53,9 @@ router.post("/auth/signup", async (req, res): Promise<void> => {
       passwordHash,
     })
     .returning();
-
   req.session.storeId = store.id;
-
   res.status(201).json(SignupResponse.parse(toStoreResponse(store)));
 });
-
 /**
  * POST /auth/login
  */
@@ -76,30 +65,23 @@ router.post("/auth/login", async (req, res): Promise<void> => {
     res.status(400).json({ error: parsed.error.message });
     return;
   }
-
   const { owner_email, password } = parsed.data;
-
   const [store] = await db
     .select()
     .from(storesTable)
     .where(eq(storesTable.ownerEmail, owner_email));
-
   if (!store || !store.passwordHash) {
     res.status(401).json({ error: "Invalid credentials" });
     return;
   }
-
   const valid = await bcrypt.compare(password, store.passwordHash);
   if (!valid) {
     res.status(401).json({ error: "Invalid credentials" });
     return;
   }
-
   req.session.storeId = store.id;
-
   res.json(LoginResponse.parse(toStoreResponse(store)));
 });
-
 /**
  * POST /auth/logout
  */
@@ -109,7 +91,6 @@ router.post("/auth/logout", (req, res): void => {
     res.json(LogoutResponse.parse({ success: true }));
   });
 });
-
 /**
  * GET /auth/me
  */
@@ -118,18 +99,14 @@ router.get("/auth/me", async (req, res): Promise<void> => {
     res.status(401).json({ error: "Not logged in" });
     return;
   }
-
   const [store] = await db
     .select()
     .from(storesTable)
     .where(eq(storesTable.id, req.session.storeId));
-
   if (!store) {
     res.status(401).json({ error: "Not logged in" });
     return;
   }
-
   res.json(GetCurrentUserResponse.parse(toStoreResponse(store)));
 });
-
 export default router;
