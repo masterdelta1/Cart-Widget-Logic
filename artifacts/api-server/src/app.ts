@@ -8,6 +8,7 @@ import router from "./routes";
 import widgetRouter from "./routes/widget";
 import { logger } from "./lib/logger";
 const app: Express = express();
+app.set("trust proxy", 1);
 const PgSession = connectPgSimple(session);
 if (!process.env.SESSION_SECRET) {
   throw new Error(
