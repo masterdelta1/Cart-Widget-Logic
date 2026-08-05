@@ -54,7 +54,13 @@ router.post("/auth/signup", async (req, res): Promise<void> => {
     })
     .returning();
   req.session.storeId = store.id;
-  res.status(201).json(SignupResponse.parse(toStoreResponse(store)));
+  req.session.save((err) => {
+    if (err) {
+      res.status(500).json({ error: "Session save failed" });
+      return;
+    }
+    res.status(201).json(SignupResponse.parse(toStoreResponse(store)));
+  });
 });
 /**
  * POST /auth/login
@@ -80,7 +86,13 @@ router.post("/auth/login", async (req, res): Promise<void> => {
     return;
   }
   req.session.storeId = store.id;
-  res.json(LoginResponse.parse(toStoreResponse(store)));
+  req.session.save((err) => {
+    if (err) {
+      res.status(500).json({ error: "Session save failed" });
+      return;
+    }
+    res.json(LoginResponse.parse(toStoreResponse(store)));
+  });
 });
 /**
  * POST /auth/logout
