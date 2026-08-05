@@ -24,3 +24,7 @@ packages = ["run"]
 
 [[ports]]
 localPort = 3000
+
+[[ports]]
+localPort = 8081
+externalPort = 80
