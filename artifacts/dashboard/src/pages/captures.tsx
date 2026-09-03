@@ -47,9 +47,20 @@ export default function Captures() {
   const renderCartSummary = (snapshot: any) => {
     if (!snapshot) return <span className="text-muted-foreground">Empty</span>
     
-    // Attempt to parse standard Shopify cart properties if they exist
+    // Shopify cart.js totals are in minor units (paise/cents). Custom cart
+    // bridges send major units (e.g. 699 means ₹699). New captures include
+    // price_unit; infer the custom shape for older captures.
     if (snapshot.item_count !== undefined && snapshot.total_price !== undefined) {
-      const price = (snapshot.total_price / 100).toFixed(2)
+      const firstItem = Array.isArray(snapshot.items) ? snapshot.items[0] : null
+      const looksLikeLegacyCustomCart = Boolean(
+        firstItem &&
+        ("qty" in firstItem || "img" in firstItem || "size" in firstItem)
+      )
+      const priceUnit = snapshot.price_unit ||
+        (looksLikeLegacyCustomCart ? "major" : "minor")
+      const rawPrice = Number(snapshot.total_price)
+      const amount = priceUnit === "minor" ? rawPrice / 100 : rawPrice
+      const price = Number.isInteger(amount) ? String(amount) : amount.toFixed(2)
       return (
         <div className="flex flex-col gap-0.5">
           <span className="font-medium text-foreground">{snapshot.item_count} items</span>

@@ -40,6 +40,9 @@
     'cart-to-whatsapp:updated';
   var customCartHandler = null;
   var customCartQueue = [];
+  // Shopify's /cart.js uses minor units; custom cart bridges use major units
+  // unless data-cart-price-unit="minor" is explicitly provided.
+  var cartPriceUnit = 'minor';
 
   function receiveCustomCart(cartData) {
     if (customCartHandler) {
@@ -239,8 +242,12 @@
     var fetchInFlight = false;
     var customCartUrl = script && script.getAttribute('data-cart-url');
     var usesCustomBridge = Boolean(script && script.hasAttribute('data-cart-event'));
+    var customPriceUnit = script && script.getAttribute('data-cart-price-unit') === 'minor'
+      ? 'minor'
+      : 'major';
 
     function handleCustomCart(customCart) {
+      cartPriceUnit = customPriceUnit;
       var items = normaliseCustomCart(customCart);
       var count = getCustomCartCount(customCart, items);
       if (count > lastKnownCount) {
@@ -265,6 +272,7 @@
         .then(function (r) { return r.json(); })
         .then(function (cartSnapshot) {
           fetchInFlight = false;
+          if (customCartUrl) cartPriceUnit = customPriceUnit;
           var items = customCartUrl
             ? normaliseCustomCart(cartSnapshot)
             : normaliseCart(cartSnapshot);
@@ -649,11 +657,16 @@
         item_count: cartRaw.item_count,
         total_price: cartRaw.total_price,
         items: cartRaw.items,
+        price_unit: cartPriceUnit,
       };
     } else if (Array.isArray(cartRaw)) {
-      snapshot = { item_count: cart.length, items: cartRaw };
+      snapshot = {
+        item_count: cart.length,
+        items: cartRaw,
+        price_unit: cartPriceUnit,
+      };
     } else {
-      snapshot = { items: cart };
+      snapshot = { items: cart, price_unit: cartPriceUnit };
     }
 
     fetch(API_BASE + '/captures', {
