@@ -15,10 +15,10 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
 
   useEffect(() => {
-    if (!isLoading && (isError || !user)) {
+    if (!isLoading && (isError || !user) && location !== "/login") {
       setLocation("/login")
     }
-  }, [isLoading, isError, user, setLocation])
+  }, [isLoading, isError, user, location])
 
   if (isLoading) {
     return (

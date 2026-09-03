@@ -8,3 +8,5 @@ Express sessions must trust the Replit proxy and use secure cookies when served 
 **Why:** connect-pg-simple's automatic setup reads its package-local table.sql using runtime `__dirname`; the esbuild output does not contain that asset, so session cookies can be emitted while session writes fail with an ENOENT error.
 
 **How to apply:** Keep the session table in the database schema and disable automatic table creation, while retaining `app.set("trust proxy", 1)` and HTTPS-compatible cookie settings. Widget install attributes must match exactly; accept the dashboard's `data-store-id` and legacy `data-store`.
+
+Route-protection effects must guard against navigating to the route they are already on before calling Wouter's `setLocation`; otherwise the development router can repeatedly push history and hit React's maximum update depth.

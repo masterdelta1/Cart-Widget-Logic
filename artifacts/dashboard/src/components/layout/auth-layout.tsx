@@ -10,10 +10,10 @@ export function AuthLayout({ children }: { children: React.ReactNode }) {
   })
 
   useEffect(() => {
-    if (!isLoading && user) {
+    if (!isLoading && user && location !== "/settings") {
       setLocation("/settings")
     }
-  }, [isLoading, user, setLocation])
+  }, [isLoading, user, location])
 
   if (isLoading) {
     return (
