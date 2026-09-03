@@ -12,7 +12,7 @@ const widgetPath = path.resolve(__dirname, "../public/widget.js");
  * GET /widget.js
  * Serves the cart-to-WhatsApp widget script.
  * Store owners paste this into their Shopify theme:
- *   <script src="https://yourapp.com/widget.js" data-store="{store_id}" defer></script>
+ *   <script src="https://yourapp.com/widget.js" data-store-id="{store_id}" defer></script>
  *
  * Note: This route is registered at the Express app level (before the /api prefix)
  * and the service path "/widget.js" is declared in artifact.toml so the proxy routes it here.
@@ -27,6 +27,9 @@ router.get("/widget.js", (req, res): void => {
   res.setHeader("Cache-Control", "public, max-age=60");
   // Allow any Shopify storefront to load this script
   res.setHeader("Access-Control-Allow-Origin", "*");
+  // A wildcard origin cannot be combined with credentialed CORS. The widget
+  // itself is public and does not need the dashboard session cookie.
+  res.removeHeader("Access-Control-Allow-Credentials");
   res.sendFile(widgetPath);
 });
 

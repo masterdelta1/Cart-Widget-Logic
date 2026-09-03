@@ -42,7 +42,10 @@ app.use(
     store: new PgSession({
       pool,
       tableName: "session",
-      createTableIfMissing: true,
+      // The session table is managed by the Drizzle schema. Keeping this
+      // disabled avoids connect-pg-simple trying to read table.sql from the
+      // esbuild output directory.
+      createTableIfMissing: false,
     }),
     secret: process.env.SESSION_SECRET,
     resave: false,

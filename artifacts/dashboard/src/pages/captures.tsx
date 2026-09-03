@@ -1,4 +1,9 @@
-import { useGetStoreCaptures, useGetCurrentUser } from "@workspace/api-client-react"
+import {
+  getGetCurrentUserQueryKey,
+  getGetStoreCapturesQueryKey,
+  useGetCurrentUser,
+  useGetStoreCaptures,
+} from "@workspace/api-client-react"
 import { format } from "date-fns"
 import { Download, Loader2, MessageCircle, MessageSquare } from "lucide-react"
 
@@ -23,9 +28,11 @@ import { Skeleton } from "@/components/ui/skeleton"
 
 export default function Captures() {
   const { data: store, isLoading: storeLoading } = useGetCurrentUser()
-  const { data: captureData, isLoading: capturesLoading } = useGetStoreCaptures(store?.id || "", undefined, {
+  const storeId = store?.id || ""
+  const { data: captureData, isLoading: capturesLoading } = useGetStoreCaptures(storeId, undefined, {
     query: {
-      enabled: !!store?.id
+      queryKey: getGetStoreCapturesQueryKey(storeId),
+      enabled: !!store?.id,
     }
   })
 

@@ -5,7 +5,7 @@
  * real Shopify cart events, and fires tiered nudge popups on WhatsApp/SMS.
  *
  * Usage:
- *   <script src="https://yourapp.com/widget.js" data-store="{store_id}" defer></script>
+ *   <script src="https://yourapp.com/widget.js" data-store-id="{store_id}" defer></script>
  *
  * The API base URL is derived from the script's own src (no extra data-* needed).
  * Override with data-api="https://..." if you're serving the widget from a CDN
@@ -20,11 +20,13 @@
 
   var script = document.currentScript ||
     (function () {
-      var tags = document.querySelectorAll('script[data-store]');
+      var tags = document.querySelectorAll('script[data-store-id], script[data-store]');
       return tags[tags.length - 1]; // last matching tag if currentScript is unavailable
     })();
 
-  var storeId = script && script.getAttribute('data-store');
+  // data-store-id is the dashboard's install-snippet attribute. Keep
+  // data-store as a backwards-compatible alias for older snippets.
+  var storeId = script && (script.getAttribute('data-store-id') || script.getAttribute('data-store'));
   if (!storeId) {
     // Fail silently — don't break the merchant's storefront
     return;

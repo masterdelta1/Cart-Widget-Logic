@@ -1,3 +1,4 @@
 - [Orval zod-v4 codegen patch](orval-zod-patch.md) — orval v8 emits zod v4 API; patch import via sed in codegen script.
 - [Widget.js path resolution](widget-path.md) — esbuild compiles to dist/; widget.js public path is ../public/widget.js from __dirname at runtime.
 - [Cart-to-WA widget architecture](cart-wa-architecture.md) — core decisions: store UUID = install token, cart_snapshot as raw jsonb, HOOKS three-tier matching, price in paise ÷100 for display.
+- [Session and widget delivery quirks](session-and-widget-delivery.md) — manage connect-pg-simple's table in Drizzle; trust the proxy; keep widget data attributes backward-compatible.

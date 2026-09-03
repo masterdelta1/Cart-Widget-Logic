@@ -1,11 +1,13 @@
 import { useLocation } from "wouter"
-import { useGetCurrentUser } from "@workspace/api-client-react"
+import { getGetCurrentUserQueryKey, useGetCurrentUser } from "@workspace/api-client-react"
 import { useEffect } from "react"
 import { Loader2 } from "lucide-react"
 
 export function AuthLayout({ children }: { children: React.ReactNode }) {
   const [location, setLocation] = useLocation()
-  const { data: user, isLoading } = useGetCurrentUser()
+  const { data: user, isLoading } = useGetCurrentUser({
+    query: { queryKey: getGetCurrentUserQueryKey(), retry: false },
+  })
 
   useEffect(() => {
     if (!isLoading && user) {
@@ -27,9 +29,6 @@ export function AuthLayout({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="flex min-h-screen w-full bg-background relative overflow-hidden selection:bg-primary/20">
-      {/* Decorative noise/gradient overlay */}
-      <div className="pointer-events-none fixed inset-0 opacity-[0.03] bg-[url('https://grainy-gradients.vercel.app/noise.svg')]" />
-      
       <div className="flex flex-1 flex-col justify-center px-4 py-12 sm:px-6 lg:flex-none lg:px-20 xl:px-24 z-10 relative">
         <div className="mx-auto w-full max-w-sm lg:w-96">
           <div className="mb-8">

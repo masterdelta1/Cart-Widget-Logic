@@ -1,5 +1,5 @@
 import { useLocation } from "wouter"
-import { useGetCurrentUser, useLogout } from "@workspace/api-client-react"
+import { getGetCurrentUserQueryKey, useGetCurrentUser, useLogout } from "@workspace/api-client-react"
 import { Link } from "wouter"
 import { Settings, LogOut, Inbox, ExternalLink, Menu, X, Loader2 } from "lucide-react"
 import { useState, useEffect } from "react"
@@ -8,7 +8,9 @@ import { Button } from "@/components/ui/button"
 
 export function DashboardLayout({ children }: { children: React.ReactNode }) {
   const [location, setLocation] = useLocation()
-  const { data: user, isLoading, isError } = useGetCurrentUser()
+  const { data: user, isLoading, isError } = useGetCurrentUser({
+    query: { queryKey: getGetCurrentUserQueryKey(), retry: false },
+  })
   const logout = useLogout()
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
 
