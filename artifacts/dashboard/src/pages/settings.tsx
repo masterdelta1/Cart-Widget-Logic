@@ -103,6 +103,7 @@ export default function Settings() {
 
   const origin = typeof window !== "undefined" ? window.location.origin : "https://example.com"
   const snippet = store ? `<script src="${origin}/widget.js" data-store-id="${store.id}"></script>` : ""
+  const isShopifyStore = Boolean(store?.store_domain.toLowerCase().endsWith(".myshopify.com"))
 
   const copyToClipboard = () => {
     navigator.clipboard.writeText(snippet)
@@ -131,18 +132,28 @@ export default function Settings() {
         <div className="bg-primary/5 border-b px-6 py-4 flex items-center justify-between">
            <div>
              <h3 className="font-semibold font-serif text-lg text-primary">Installation</h3>
-             <p className="text-sm text-primary/70">Add the widget to your Shopify store.</p>
+               <p className="text-sm text-primary/70">
+                 {isShopifyStore ? "Add the widget to your Shopify store." : "Add the widget to your custom website."}
+               </p>
            </div>
         </div>
         <CardContent className="p-6 space-y-6">
           <div className="grid gap-6 md:grid-cols-[1fr_300px]">
             <div className="space-y-4">
               <h4 className="font-medium text-sm text-foreground uppercase tracking-wide">Instructions</h4>
-              <ol className="list-decimal list-inside space-y-3 text-sm text-muted-foreground ml-1">
-                <li>Go to your Shopify Admin and navigate to <strong>Online Store &gt; Themes</strong>.</li>
-                <li>Click <strong>Edit code</strong> on your active theme.</li>
-                <li>Open <strong>theme.liquid</strong> and paste the snippet below just before the closing <code>&lt;/body&gt;</code> tag, then save.</li>
-              </ol>
+              {isShopifyStore ? (
+                <ol className="list-decimal list-inside space-y-3 text-sm text-muted-foreground ml-1">
+                  <li>Go to your Shopify Admin and navigate to <strong>Online Store &gt; Themes</strong>.</li>
+                  <li>Click <strong>Edit code</strong> on your active theme.</li>
+                  <li>Open <strong>theme.liquid</strong> and paste the snippet below just before the closing <code>&lt;/body&gt;</code> tag, then save.</li>
+                </ol>
+              ) : (
+                <ol className="list-decimal list-inside space-y-3 text-sm text-muted-foreground ml-1">
+                  <li>Open the HTML template or layout shared by your website pages.</li>
+                  <li>Paste the snippet below just before the closing <code>&lt;/body&gt;</code> tag.</li>
+                  <li>Save and publish your website changes.</li>
+                </ol>
+              )}
             </div>
             
             <div className="bg-secondary/50 rounded-lg p-4 border flex flex-col justify-center gap-3">

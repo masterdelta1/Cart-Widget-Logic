@@ -21,8 +21,15 @@ import {
 const signupSchema = z.object({
   owner_email: z.string().email({ message: "Please enter a valid email address." }),
   password: z.string().min(8, { message: "Password must be at least 8 characters." }),
-  store_domain: z.string().min(3, { message: "Store domain is required." }).refine(val => !val.includes("http"), {
-    message: "Enter the domain only (e.g., store.myshopify.com)"
+  store_domain: z.string().trim().min(3, { message: "Website domain is required." }).refine((value) => {
+    const candidate = /^https?:\/\//i.test(value) ? value : `https://${value}`
+    try {
+      return Boolean(new URL(candidate).hostname)
+    } catch {
+      return false
+    }
+  }, {
+    message: "Enter a valid website domain or URL (e.g., example.com).",
   }),
 })
 
@@ -40,8 +47,13 @@ export default function Signup() {
   })
 
   function onSubmit(values: z.infer<typeof signupSchema>) {
+    const storeDomain = values.store_domain
+      .trim()
+      .replace(/^https?:\/\//i, "")
+      .replace(/\/+$/, "")
+
     signupMutation.mutate(
-      { data: values },
+      { data: { ...values, store_domain: storeDomain } },
       {
         onSuccess: () => {
           toast.success("Account created successfully")
@@ -77,12 +89,12 @@ export default function Signup() {
             name="store_domain"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Shopify Domain</FormLabel>
+                <FormLabel>Website domain</FormLabel>
                 <FormControl>
-                  <Input placeholder="your-store.myshopify.com" {...field} autoComplete="url" />
+                  <Input placeholder="example.com" {...field} autoComplete="url" />
                 </FormControl>
                 <FormDescription>
-                  The `.myshopify.com` domain used to identify your store.
+                  Enter your custom website domain. Shopify stores can also use their `.myshopify.com` domain.
                 </FormDescription>
                 <FormMessage />
               </FormItem>
