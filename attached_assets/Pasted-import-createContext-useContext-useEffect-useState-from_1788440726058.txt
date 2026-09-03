@@ -1,0 +1,156 @@
+import { createContext, useContext, useEffect, useState } from "react";
+
+const CartContext = createContext(null);
+
+export function CartProvider({ children }) {
+  const [items, setItems] = useState([]);
+  const [loaded, setLoaded] = useState(false);
+
+  // Load cart from localStorage on mount
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem("tor_cart");
+
+      if (saved) {
+        setItems(JSON.parse(saved));
+      }
+    } catch (e) {
+      // Ignore invalid localStorage data
+    }
+
+    setLoaded(true);
+  }, []);
+
+  // Persist cart whenever it changes
+  useEffect(() => {
+    if (!loaded) return;
+
+    try {
+      localStorage.setItem("tor_cart", JSON.stringify(items));
+    } catch (e) {
+      // Ignore localStorage errors
+    }
+  }, [items, loaded]);
+
+  // Notify external integrations whenever the cart changes
+  // This allows the Cart-to-WhatsApp system to detect
+  // changes to the custom Outfit Room cart.
+  useEffect(() => {
+    if (!loaded) return;
+
+    const cartData = {
+      items,
+      total: items.reduce(
+        (sum, item) => sum + Number(item.price || 0) * Number(item.qty || 0),
+        0
+      ),
+      count: items.reduce(
+        (sum, item) => sum + Number(item.qty || 0),
+        0
+      ),
+    };
+
+    window.dispatchEvent(
+      new CustomEvent("tor:cart:updated", {
+        detail: cartData,
+      })
+    );
+  }, [items, loaded]);
+
+  const addItem = (product, size) => {
+    setItems((prev) => {
+      const existing = prev.find(
+        (item) =>
+          item.productId === product.id && item.size === size
+      );
+
+      if (existing) {
+        return prev.map((item) =>
+          item.productId === product.id && item.size === size
+            ? { ...item, qty: item.qty + 1 }
+            : item
+        );
+      }
+
+      return [
+        ...prev,
+        {
+          productId: product.id,
+          name: product.name,
+          price: product.price,
+          img: product.images?.[0] || "",
+          size,
+          qty: 1,
+        },
+      ];
+    });
+  };
+
+  const updateQty = (productId, size, qty) => {
+    if (qty <= 0) {
+      removeItem(productId, size);
+      return;
+    }
+
+    setItems((prev) =>
+      prev.map((item) =>
+        item.productId === productId && item.size === size
+          ? { ...item, qty }
+          : item
+      )
+    );
+  };
+
+  const removeItem = (productId, size) => {
+    setItems((prev) =>
+      prev.filter(
+        (item) =>
+          !(
+            item.productId === productId &&
+            item.size === size
+          )
+      )
+    );
+  };
+
+  const clearCart = () => {
+    setItems([]);
+  };
+
+  const total = items.reduce(
+    (sum, item) =>
+      sum + Number(item.price || 0) * Number(item.qty || 0),
+    0
+  );
+
+  const count = items.reduce(
+    (sum, item) => sum + Number(item.qty || 0),
+    0
+  );
+
+  return (
+    <CartContext.Provider
+      value={{
+        items,
+        addItem,
+        updateQty,
+        removeItem,
+        clearCart,
+        total,
+        count,
+      }}
+    >
+      {children}
+    </CartContext.Provider>
+  );
+}
+
+export function useCart() {
+  const ctx = useContext(CartContext);
+
+  if (!ctx) {
+    throw new Error("useCart must be used inside CartProvider");
+  }
+
+  return ctx;
+}
