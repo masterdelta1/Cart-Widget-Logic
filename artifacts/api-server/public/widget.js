@@ -1,11 +1,15 @@
 /**
  * Cart-to-WhatsApp Widget
  * =======================
- * Drop-in script for Shopify themes. Reads config from the API, listens for
- * real Shopify cart events, and fires tiered nudge popups on WhatsApp/SMS.
+ * Drop-in script for Shopify themes and custom websites. Reads config from the
+ * API, listens for cart updates, and fires tiered nudge popups on WhatsApp/SMS.
  *
  * Usage:
  *   <script src="https://yourapp.com/widget.js" data-store-id="{store_id}" defer></script>
+ *
+ * Custom websites should add data-cart-event="cart-to-whatsapp:updated" and
+ * dispatch that event with the cart object in event.detail, or call
+ * window.CartToWhatsAppWidget.updateCart(cart).
  *
  * The API base URL is derived from the script's own src (no extra data-* needed).
  * Override with data-api="https://..." if you're serving the widget from a CDN
@@ -31,6 +35,31 @@
     // Fail silently — don't break the merchant's storefront
     return;
   }
+
+  var customCartEventName = (script && script.getAttribute('data-cart-event')) ||
+    'cart-to-whatsapp:updated';
+  var customCartHandler = null;
+  var customCartQueue = [];
+
+  function receiveCustomCart(cartData) {
+    if (customCartHandler) {
+      customCartHandler(cartData);
+    } else {
+      customCartQueue.push(cartData);
+    }
+  }
+
+  window.addEventListener(customCartEventName, function (event) {
+    receiveCustomCart(event.detail);
+  });
+  document.addEventListener(customCartEventName, function (event) {
+    receiveCustomCart(event.detail);
+  });
+
+  // Expose a small framework-agnostic bridge for React, Next.js, and other
+  // custom carts. The function also buffers updates until config is loaded.
+  window.CartToWhatsAppWidget = window.CartToWhatsAppWidget || {};
+  window.CartToWhatsAppWidget.updateCart = receiveCustomCart;
 
   // Derive API base from the script's own src URL, or allow explicit override
   var API_BASE = (script && script.getAttribute('data-api')) ||
@@ -151,6 +180,51 @@
     });
   }
 
+  function getCustomCartItems(customCart) {
+    if (Array.isArray(customCart)) return customCart;
+    if (customCart && Array.isArray(customCart.items)) return customCart.items;
+    if (customCart && customCart.cart && Array.isArray(customCart.cart.items)) {
+      return customCart.cart.items;
+    }
+    return [];
+  }
+
+  function getCustomCartCount(customCart, items) {
+    if (customCart && typeof customCart.item_count === 'number') return customCart.item_count;
+    return items.reduce(function (total, item) {
+      return total + Number(item.quantity || item.qty || 1);
+    }, 0);
+  }
+
+  function getCustomCartPrice(item) {
+    if (typeof item.price === 'number') return item.price;
+    if (typeof item.amount === 'number') return item.amount;
+    if (typeof item.priceRaw === 'number') return item.priceRaw;
+    return 0;
+  }
+
+  function normaliseCustomCart(customCart) {
+    var currency = (config && config.currency) || '₹';
+    var items = getCustomCartItems(customCart);
+    var priceUnit = script && script.getAttribute('data-cart-price-unit');
+    var isMinorUnit = priceUnit === 'minor';
+
+    return items.map(function (item) {
+      var price = getCustomCartPrice(item);
+      var displayPrice = isMinorUnit ? price / 100 : price;
+      return {
+        name: item.name || item.title || (item.product && item.product.title) || 'Item',
+        type: item.product_type || item.productType || item.type || '',
+        qty: Number(item.quantity || item.qty || 1),
+        price: currency + Math.round(displayPrice),
+        priceRaw: price,
+        variantTitle: item.variant_title || item.variantTitle || '',
+        imageUrl: item.imageUrl || item.image || item.image_url ||
+          (item.featured_image && item.featured_image.url) || null,
+      };
+    });
+  }
+
   // ─────────────────────────────────────────────────────────────────────────────
   // 5. CART EVENT DETECTION — four-layer interception
   //
@@ -163,19 +237,45 @@
   function initCartListener(onCartItemAdded) {
     var lastKnownCount = 0;
     var fetchInFlight = false;
+    var customCartUrl = script && script.getAttribute('data-cart-url');
+    var usesCustomBridge = Boolean(script && script.hasAttribute('data-cart-event'));
+
+    function handleCustomCart(customCart) {
+      var items = normaliseCustomCart(customCart);
+      var count = getCustomCartCount(customCart, items);
+      if (count > lastKnownCount) {
+        lastKnownCount = count;
+        onCartItemAdded(items, customCart);
+      } else {
+        lastKnownCount = count;
+      }
+    }
+
+    if (usesCustomBridge) {
+      customCartHandler = handleCustomCart;
+      customCartQueue.forEach(handleCustomCart);
+      customCartQueue = [];
+      return;
+    }
 
     function syncCart() {
       if (fetchInFlight) return;
       fetchInFlight = true;
-      fetch('/cart.js', { credentials: 'same-origin' })
+      fetch(customCartUrl || '/cart.js', { credentials: 'same-origin' })
         .then(function (r) { return r.json(); })
-        .then(function (shopifyCart) {
+        .then(function (cartSnapshot) {
           fetchInFlight = false;
-          if (shopifyCart.item_count > lastKnownCount) {
-            lastKnownCount = shopifyCart.item_count;
-            onCartItemAdded(normaliseCart(shopifyCart), shopifyCart);
+          var items = customCartUrl
+            ? normaliseCustomCart(cartSnapshot)
+            : normaliseCart(cartSnapshot);
+          var count = customCartUrl
+            ? getCustomCartCount(cartSnapshot, items)
+            : cartSnapshot.item_count;
+          if (count > lastKnownCount) {
+            lastKnownCount = count;
+            onCartItemAdded(items, cartSnapshot);
           } else {
-            lastKnownCount = shopifyCart.item_count;
+            lastKnownCount = count;
           }
         })
         .catch(function () { fetchInFlight = false; });
@@ -265,9 +365,12 @@
     })();
 
     // Seed baseline count
-    fetch('/cart.js', { credentials: 'same-origin' })
+    fetch(customCartUrl || '/cart.js', { credentials: 'same-origin' })
       .then(function (r) { return r.json(); })
-      .then(function (c) { lastKnownCount = c.item_count; })
+      .then(function (c) {
+        var items = customCartUrl ? normaliseCustomCart(c) : normaliseCart(c);
+        lastKnownCount = customCartUrl ? getCustomCartCount(c, items) : c.item_count;
+      })
       .catch(function () {});
   }
 
@@ -540,9 +643,18 @@
 
   function postCapture(channel) {
     var tier = tier2Shown ? 2 : 1;
-    var snapshot = cartRaw
-      ? { item_count: cartRaw.item_count, total_price: cartRaw.total_price, items: cartRaw.items }
-      : { items: cart };
+    var snapshot;
+    if (cartRaw && Array.isArray(cartRaw.items)) {
+      snapshot = {
+        item_count: cartRaw.item_count,
+        total_price: cartRaw.total_price,
+        items: cartRaw.items,
+      };
+    } else if (Array.isArray(cartRaw)) {
+      snapshot = { item_count: cart.length, items: cartRaw };
+    } else {
+      snapshot = { items: cart };
+    }
 
     fetch(API_BASE + '/captures', {
       method: 'POST',

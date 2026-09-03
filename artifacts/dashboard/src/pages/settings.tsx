@@ -102,8 +102,10 @@ export default function Settings() {
   }
 
   const origin = typeof window !== "undefined" ? window.location.origin : "https://example.com"
-  const snippet = store ? `<script src="${origin}/widget.js" data-store-id="${store.id}"></script>` : ""
   const isShopifyStore = Boolean(store?.store_domain.toLowerCase().endsWith(".myshopify.com"))
+  const snippet = store
+    ? `<script src="${origin}/widget.js" data-store-id="${store.id}"${isShopifyStore ? "" : ' data-cart-event="cart-to-whatsapp:updated"'}></script>`
+    : ""
 
   const copyToClipboard = () => {
     navigator.clipboard.writeText(snippet)
@@ -151,7 +153,7 @@ export default function Settings() {
                 <ol className="list-decimal list-inside space-y-3 text-sm text-muted-foreground ml-1">
                   <li>Open the HTML template or layout shared by your website pages.</li>
                   <li>Paste the snippet below just before the closing <code>&lt;/body&gt;</code> tag.</li>
-                  <li>Save and publish your website changes.</li>
+                  <li>When the cart changes, dispatch the <code>cart-to-whatsapp:updated</code> event with your cart object in <code>event.detail</code>, then save and publish.</li>
                 </ol>
               )}
             </div>
