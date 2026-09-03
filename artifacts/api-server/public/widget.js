@@ -219,7 +219,7 @@
         price: currency + Math.round(displayPrice),
         priceRaw: price,
         variantTitle: item.variant_title || item.variantTitle || '',
-        imageUrl: item.imageUrl || item.image || item.image_url ||
+        imageUrl: item.imageUrl || item.image || item.image_url || item.img ||
           (item.featured_image && item.featured_image.url) || null,
       };
     });

@@ -1,0 +1,112 @@
+import { useState } from "react";
+import { useCart } from "../lib/cart";
+import { WHATSAPP_NUMBER } from "../lib/config";
+
+export default function Cart() {
+  const { items, updateQty, removeItem, total, clearCart } = useCart();
+  const [name, setName] = useState("");
+  const [phone, setPhone] = useState("");
+  const [err, setErr] = useState("");
+
+  const buildMessage = () => {
+    const lines = items.map(
+      (i) => `${i.name} (Size ${i.size}) x${i.qty} — ₹${i.price * i.qty}`
+    );
+    return (
+      `Hi! I'd like to order:\n\n` +
+      lines.join("\n") +
+      `\n\nTotal: ₹${total}\n\n` +
+      `Name: ${name}\nPhone: ${phone}\n\n` +
+      `Please confirm availability and delivery.`
+    );
+  };
+
+  const handleCheckout = async () => {
+    if (!name.trim() || !phone.trim()) {
+      setErr("Please enter your name and phone number.");
+      return;
+    }
+    if (phone.trim().length < 10) {
+      setErr("Please enter a valid phone number.");
+      return;
+    }
+    setErr("");
+
+    // Log the order to the backend before redirecting
+    try {
+      await fetch("/api/orders", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          productName: items.map((i) => `${i.name} (${i.size}) x${i.qty}`).join(", "),
+          price: total,
+          size: items.map((i) => i.size).join(", "),
+          customerName: name,
+          customerPhone: phone,
+        }),
+      });
+    } catch (e) {
+      console.error("Order log failed", e);
+    }
+
+    const link = `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(buildMessage())}`;
+    window.open(link, "_blank");
+    clearCart();
+  };
+
+  if (items.length === 0) {
+    return (
+      <div style={{ maxWidth: 600, margin: "0 auto", padding: 40, textAlign: "center", fontFamily: "'Helvetica Neue', Arial, sans-serif" }}>
+        <h2 style={{ fontSize: 20 }}>Your cart is empty</h2>
+        <a href="/" style={{ color: "#111", fontSize: 14, textDecoration: "underline" }}>← Continue shopping</a>
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ maxWidth: 640, margin: "0 auto", padding: "28px 20px", fontFamily: "'Helvetica Neue', Arial, sans-serif" }}>
+      <a href="/" style={{ fontSize: 13, color: "#666", textDecoration: "none" }}>← Continue shopping</a>
+      <h2 style={{ margin: "14px 0 20px" }}>Your Cart</h2>
+
+      {items.map((i) => (
+        <div key={i.productId + i.size} style={{ display: "flex", gap: 12, padding: "14px 0", borderBottom: "1px solid #eee", alignItems: "center" }}>
+          <img src={i.img} alt={i.name} style={{ width: 56, height: 68, objectFit: "cover", borderRadius: 4 }} />
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: 14, fontWeight: 600 }}>{i.name}</div>
+            <div style={{ fontSize: 12, color: "#888" }}>Size: {i.size}</div>
+            <div style={{ fontSize: 13, marginTop: 4 }}>₹{i.price} x {i.qty} = ₹{i.price * i.qty}</div>
+          </div>
+          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+            <button onClick={() => updateQty(i.productId, i.size, i.qty - 1)} style={qtyBtnStyle}>−</button>
+            <span style={{ fontSize: 13, minWidth: 18, textAlign: "center" }}>{i.qty}</span>
+            <button onClick={() => updateQty(i.productId, i.size, i.qty + 1)} style={qtyBtnStyle}>+</button>
+          </div>
+          <button onClick={() => removeItem(i.productId, i.size)} style={{ border: "none", background: "none", color: "#c0392b", fontSize: 12, cursor: "pointer" }}>Remove</button>
+        </div>
+      ))}
+
+      <div style={{ display: "flex", justifyContent: "space-between", padding: "16px 0", fontSize: 16, fontWeight: 700 }}>
+        <span>Total</span>
+        <span>₹{total}</span>
+      </div>
+
+      <div style={{ background: "#fafafa", padding: 18, borderRadius: 8, marginTop: 10 }}>
+        <div style={{ fontSize: 12, color: "#666", marginBottom: 10 }}>
+          Enter your details — we'll send this order to our WhatsApp to confirm sizing and delivery.
+        </div>
+        <input placeholder="Your name" value={name} onChange={(e) => setName(e.target.value)} style={inputStyle} />
+        <input placeholder="Phone number" value={phone} onChange={(e) => setPhone(e.target.value)} style={{ ...inputStyle, marginTop: 10 }} />
+        {err && <div style={{ color: "#c0392b", fontSize: 12, marginTop: 8 }}>{err}</div>}
+        <button onClick={handleCheckout} style={{ marginTop: 14, width: "100%", background: "#25D366", color: "#fff", border: "none", padding: "13px 0", borderRadius: 6, fontWeight: 600, fontSize: 14, cursor: "pointer" }}>
+          Continue to WhatsApp
+        </button>
+        <div style={{ fontSize: 11, color: "#999", marginTop: 8, textAlign: "center" }}>
+          Cash on delivery · No payment needed now
+        </div>
+      </div>
+    </div>
+  );
+}
+
+const inputStyle = { padding: "10px 12px", borderRadius: 6, border: "1px solid #ddd", fontSize: 13, width: "100%", boxSizing: "border-box" };
+const qtyBtnStyle = { width: 24, height: 24, borderRadius: 4, border: "1px solid #ddd", background: "#fff", cursor: "pointer", fontSize: 14, lineHeight: 1 };

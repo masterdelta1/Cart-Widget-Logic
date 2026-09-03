@@ -10,3 +10,5 @@ Express sessions must trust the Replit proxy and use secure cookies when served 
 **How to apply:** Keep the session table in the database schema and disable automatic table creation, while retaining `app.set("trust proxy", 1)` and HTTPS-compatible cookie settings. Widget install attributes must match exactly; accept the dashboard's `data-store-id` and legacy `data-store`.
 
 Route-protection effects must guard against navigating to the route they are already on before calling Wouter's `setLocation`; otherwise the development router can repeatedly push history and hit React's maximum update depth.
+
+Custom storefronts must explicitly forward their framework cart state to the widget through the documented browser bridge; the widget cannot inspect a React context or provider from another application. Common item keys include name/title, qty/quantity, price, and img/image.
