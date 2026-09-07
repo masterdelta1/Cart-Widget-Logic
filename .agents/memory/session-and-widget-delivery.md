@@ -14,3 +14,9 @@ Route-protection effects must guard against navigating to the route they are alr
 Custom storefronts must explicitly forward their framework cart state to the widget through the documented browser bridge; the widget cannot inspect a React context or provider from another application. Common item keys include name/title, qty/quantity, price, and img/image.
 
 Cart snapshots need an explicit price-unit marker: Shopify `/cart.js` totals are minor units, while custom bridge totals are major currency units. Dashboard formatting should honor the marker and infer legacy custom shapes only when the marker is absent.
+
+The widget's trigger model is first-trigger-wins within browser sessionStorage: exit intent handles all carts, while engagement handles the configured add-to-cart threshold or product/collection dwell and can never fire after exit.
+
+**Why:** Overlapping idle, cart, and exit signals made behavior unpredictable and produced competing popups; a single session lock keeps the handoff deterministic.
+
+**How to apply:** Keep exit detection and engagement detection separate, but route both through one session-scoped claim before rendering any popup.

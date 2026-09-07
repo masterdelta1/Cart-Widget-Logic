@@ -2,7 +2,7 @@
  * Cart-to-WhatsApp Widget
  * =======================
  * Drop-in script for Shopify themes and custom websites. Reads config from the
- * API, listens for cart updates, and fires tiered nudge popups on WhatsApp/SMS.
+ * API, listens for cart updates, and hands shoppers to WhatsApp at two moments.
  *
  * Usage:
  *   <script src="https://yourapp.com/widget.js" data-store-id="{store_id}" defer></script>
@@ -94,70 +94,70 @@
   }
 
   // ─────────────────────────────────────────────────────────────────────────────
-  // 3. HOOKS — three-tier matching
-  //
-  // Tier A: Exact match on product_type
-  // Tier B: Normalized substring match (lowercase, strip hyphens/spaces)
-  //         Maps common keywords to the closest HOOKS key
-  // Tier C: Generic fallback — never a blank/broken popup
+  // 3. TWO-TRIGGER CONFIGURATION & PAGE CONTEXT
   // ─────────────────────────────────────────────────────────────────────────────
 
-  var HOOKS = {
-    'Oversized T-Shirt': "Want to make sure you pick the perfect oversized fit? We'll recommend your ideal size and matching bottoms.",
-    'Graphic T-Shirt':   "We'll recommend bottoms and layering pieces that match this graphic.",
-    'Shirt':             "We'll help you choose the right fit and suggest trousers or jeans that complement this shirt.",
-    'Linen Shirt':       "We'll recommend the best fit and create a complete summer outfit around this linen shirt.",
-    'Jeans':             "Need help choosing the right waist and fit? We'll also suggest tops that pair well with these jeans.",
-    'Cargo Pants':       "We'll help you pick the right fit and recommend oversized tees or shirts that complete the look.",
-    'Hoodie':            "We'll recommend the perfect size and matching joggers or cargos.",
-    'Jacket':            "We'll suggest the best layering pieces and help you choose the right size.",
-    'Co-ord Set':        "We'll help you choose the perfect fit and recommend accessories to complete the look.",
-    'Shorts':            "We'll recommend matching tees or shirts and help you pick the best fit."
-  };
+  // Two trigger constants. Keep these together so engagement behavior is easy
+  // to tune without scattering magic numbers through the event handlers.
+  var ENGAGEMENT_ADD_TO_CART_THRESHOLD = 2;
+  var ENGAGEMENT_DWELL_THRESHOLD_SECONDS = 45;
+  var SESSION_TRIGGER_KEY = 'cart-to-whatsapp:trigger';
+  var sessionTrigger = null;
 
-  // Keyword → HOOKS key map for normalized matching
-  var KEYWORD_MAP = [
-    ['oversized',    'Oversized T-Shirt'],
-    ['graphic',      'Graphic T-Shirt'],
-    ['linen',        'Linen Shirt'],
-    ['tshirt',       'Oversized T-Shirt'],   // t-shirt, tee, tshirts → default oversized hook
-    ['tee',          'Graphic T-Shirt'],
-    ['shirt',        'Shirt'],
-    ['jean',         'Jeans'],
-    ['denim',        'Jeans'],
-    ['cargo',        'Cargo Pants'],
-    ['pant',         'Cargo Pants'],
-    ['trouser',      'Jeans'],
-    ['hoodie',       'Hoodie'],
-    ['sweat',        'Hoodie'],
-    ['jacket',       'Jacket'],
-    ['blazer',       'Jacket'],
-    ['overshirt',    'Jacket'],
-    ['coord',        'Co-ord Set'],
-    ['co-ord',       'Co-ord Set'],
-    ['set',          'Co-ord Set'],
-    ['short',        'Shorts'],
-  ];
+  try {
+    sessionTrigger = window.sessionStorage.getItem(SESSION_TRIGGER_KEY) || null;
+  } catch (_) {}
 
-  var GENERIC_HOOK = "We'll help you find the perfect fit for this piece.";
+  function claimTrigger(trigger) {
+    if (sessionTrigger || converted) return false;
+    sessionTrigger = trigger;
+    try {
+      window.sessionStorage.setItem(SESSION_TRIGGER_KEY, trigger);
+    } catch (_) {}
+    return true;
+  }
 
-  function resolveHook(productType, title) {
-    // Tier A: exact match
-    if (HOOKS[productType]) return HOOKS[productType];
+  function formatCategory(value) {
+    return String(value || '').replace(/[-_]+/g, ' ').replace(/\s+/g, ' ').trim();
+  }
 
-    // Tier B: normalized substring match against both product_type and title
-    var haystack = ((productType || '') + ' ' + (title || ''))
-      .toLowerCase()
-      .replace(/[\s\-_]+/g, '');
+  function getPageContext() {
+    var analytics = window.ShopifyAnalytics && window.ShopifyAnalytics.meta;
+    var product = analytics && analytics.product;
+    var themeMeta = window.meta && window.meta.product;
+    var productType = (product && (product.type || product.product_type)) ||
+      (themeMeta && (themeMeta.type || themeMeta.product_type)) || '';
+    var typeMeta = document.querySelector(
+      'meta[name="product_type"], meta[property="product:type"], [data-product-type]'
+    );
+    var collectionMeta = document.querySelector(
+      'meta[name="collection_handle"], [data-collection-handle]'
+    );
 
-    for (var i = 0; i < KEYWORD_MAP.length; i++) {
-      var keyword = KEYWORD_MAP[i][0].replace(/[\s\-_]+/g, '');
-      var hooksKey = KEYWORD_MAP[i][1];
-      if (haystack.indexOf(keyword) !== -1) return HOOKS[hooksKey];
+    productType = productType ||
+      (typeMeta && (typeMeta.content || typeMeta.getAttribute('data-product-type'))) || '';
+    var collectionHandle = collectionMeta &&
+      (collectionMeta.content || collectionMeta.getAttribute('data-collection-handle'));
+    if (!collectionHandle) {
+      var collectionMatch = window.location.pathname.match(/\/collections\/([^/?#]+)/);
+      collectionHandle = collectionMatch && collectionMatch[1];
     }
 
-    // Tier C: generic fallback
-    return GENERIC_HOOK;
+    var category = formatCategory(productType || collectionHandle);
+    var isProductOrCollectionPage = Boolean(category) ||
+      /\/products\/|\/collections\//.test(window.location.pathname);
+    return {
+      category: category,
+      isCategoryPage: Boolean(category),
+      isProductOrCollectionPage: isProductOrCollectionPage,
+    };
+  }
+
+  function getStoreLabel() {
+    if (config && config.store_domain) return config.store_domain;
+    var host = window.location.hostname.replace(/^www\./, '');
+    if (host && host !== 'localhost') return host;
+    return document.title || 'this store';
   }
 
   // ─────────────────────────────────────────────────────────────────────────────
@@ -250,6 +250,8 @@
       cartPriceUnit = customPriceUnit;
       var items = normaliseCustomCart(customCart);
       var count = getCustomCartCount(customCart, items);
+      cart = items;
+      cartRaw = customCart;
       if (count > lastKnownCount) {
         lastKnownCount = count;
         onCartItemAdded(items, customCart);
@@ -279,6 +281,8 @@
           var count = customCartUrl
             ? getCustomCartCount(cartSnapshot, items)
             : cartSnapshot.item_count;
+          cart = items;
+          cartRaw = cartSnapshot;
           if (count > lastKnownCount) {
             lastKnownCount = count;
             onCartItemAdded(items, cartSnapshot);
@@ -377,50 +381,52 @@
       .then(function (r) { return r.json(); })
       .then(function (c) {
         var items = customCartUrl ? normaliseCustomCart(c) : normaliseCart(c);
+        cart = items;
+        cartRaw = c;
         lastKnownCount = customCartUrl ? getCustomCartCount(c, items) : c.item_count;
       })
       .catch(function () {});
   }
 
   // ─────────────────────────────────────────────────────────────────────────────
-  // 6. SESSION STATE & TIER LOGIC
-  // Ported exactly from cart-whatsapp-widget-tiered-demo.html
+  // 6. SESSION STATE & TWO-TRIGGER LOGIC
   // ─────────────────────────────────────────────────────────────────────────────
 
   var cart = [];           // normalised items (our format)
   var cartRaw = null;      // raw Shopify /cart.js snapshot (for capture POST)
-  var idleTimer = null;
-  var tier1Shown = false;
-  var tier1Dismissed = false;
-  var tier2Shown = false;
   var converted = false;
-
-  var IDLE_MS = 50000; // 50s — midpoint of 45-60s range; adjust per merchant if needed
+  var activeTrigger = null;
+  var engagementContext = null;
+  var selectedIntent = null;
 
   function onCartItemAdded(normalisedItems, shopifyCart) {
     cart = normalisedItems;
     cartRaw = shopifyCart;
 
     if (converted) return;
-
-    if (!tier1Shown) {
-      // (Re)start the idle countdown. Restart if cart grows before it fires.
-      clearTimeout(idleTimer);
-      idleTimer = setTimeout(fireTier1, IDLE_MS);
+    if (getCartCount(shopifyCart, normalisedItems) >= ENGAGEMENT_ADD_TO_CART_THRESHOLD) {
+      fireEngagement();
     }
-    // If Tier 1 already shown/dismissed, do nothing — leave signals handle Tier 2
   }
 
-  function fireTier1() {
-    if (tier1Shown || converted || cart.length === 0) return;
-    tier1Shown = true;
-    openWidget(1);
+  function getCartCount(rawCart, normalisedItems) {
+    if (rawCart && typeof rawCart.item_count === 'number') return rawCart.item_count;
+    return (normalisedItems || []).reduce(function (total, item) {
+      return total + Number(item.qty || 1);
+    }, 0);
   }
 
-  function fireTier2() {
-    if (!tier1Dismissed || tier2Shown || converted || cart.length === 0) return;
-    tier2Shown = true;
-    openWidget(2);
+  function fireExitIntent() {
+    if (!claimTrigger('exit')) return;
+    activeTrigger = 'exit';
+    openWidget('exit');
+  }
+
+  function fireEngagement() {
+    if (!claimTrigger('engagement')) return;
+    activeTrigger = 'engagement';
+    engagementContext = getPageContext();
+    openWidget('engagement');
   }
 
   // ─────────────────────────────────────────────────────────────────────────────
@@ -429,14 +435,14 @@
   // ─────────────────────────────────────────────────────────────────────────────
 
   function initLeaveSignals() {
-    // Tab / app switch
+    // Tab / app switch is the mobile equivalent of leaving the page.
     document.addEventListener('visibilitychange', function () {
-      if (document.hidden) fireTier2();
+      if (document.hidden) fireExitIntent();
     });
 
-    // Mouse leaving toward the tab bar (desktop only)
+    // Desktop mouse exit toward the browser chrome.
     document.addEventListener('mouseout', function (e) {
-      if (!e.relatedTarget && e.clientY <= 0) fireTier2();
+      if (!e.relatedTarget && e.clientY <= 0) fireExitIntent();
     });
 
     // Back button / back-swipe: push a trap history entry so the first
@@ -446,52 +452,56 @@
     } catch (_) {}
 
     window.addEventListener('popstate', function () {
-      var shouldIntercept = tier1Dismissed && !tier2Shown && !converted && cart.length > 0;
-      if (shouldIntercept) {
-        fireTier2();
+      if (!sessionTrigger && !converted) {
+        fireExitIntent();
         try { history.pushState({ _cwTrap: true }, '', location.href); } catch (_) {}
       }
     });
   }
 
-  // ─────────────────────────────────────────────────────────────────────────────
-  // 8. MESSAGE GENERATION
-  // Ported from demo; now uses config values and the three-tier HOOKS resolver.
-  // ─────────────────────────────────────────────────────────────────────────────
-
-  function hookForCart() {
-    if (!config) return GENERIC_HOOK;
-
-    if (config.mode === 'discount') {
-      var amt = (config.currency || '₹') + (config.discount_amount || '');
-      return cart.length === 1
-        ? 'This one\'s just for you \u2014 ' + amt + ' off, reserved on WhatsApp.'
-        : 'Sirf iss order ke liye \u2014 ' + amt + ' off, reserved on WhatsApp. Continue karo isse pehle ye chala jaaye.';
-    }
-
-    // personalized mode
-    if (cart.length === 1) {
-      return resolveHook(cart[0].type, cart[0].name);
-    }
-
-    // Multi-item: build a "you're building a full look" message
-    var shortNames = cart.map(function (item) {
-      return item.name.split(' ').slice(-1)[0];
-    }).join(' + ');
-    return 'You\'re building a full look (' + shortNames + ') \u2014 want us to suggest one more piece to complete it, and confirm sizing for everything?';
+  function initEngagementDwell() {
+    setTimeout(function () {
+      var pageContext = getPageContext();
+      if (!sessionTrigger && !converted && pageContext.isProductOrCollectionPage) {
+        fireEngagement();
+      }
+    }, ENGAGEMENT_DWELL_THRESHOLD_SECONDS * 1000);
   }
 
-  function buildMessageText(prefix) {
-    var itemList = cart.map(function (item) {
-      return item.name + ' (' + item.price + ')';
-    }).join(', ');
+  // ─────────────────────────────────────────────────────────────────────────────
+  // 8. MESSAGE GENERATION
+  // Messages use only the current cart and page context.
+  // ─────────────────────────────────────────────────────────────────────────────
 
-    if (config && config.mode === 'discount') {
-      return prefix + ' I have ' + (cart.length > 1 ? 'these items' : 'this item') +
-        ' in my cart: ' + itemList + '. Claiming my reserved discount.';
+  function buildCartMessage() {
+    return cart.map(function (item) {
+      var quantity = item.qty > 1 ? ' x' + item.qty : '';
+      return item.name + quantity;
+    }).join(', ');
+  }
+
+  function buildExitMessage() {
+    var storeLabel = getStoreLabel();
+    if (!cart.length) {
+      return 'Hi, I was checking out ' + storeLabel +
+        ' and wanted some help finding something.';
     }
-    return prefix + ' I have ' + (cart.length > 1 ? 'these items' : 'this item') +
-      ' in my cart: ' + itemList + '. ' + hookForCart();
+    return 'Hi, I was checking out ' + storeLabel +
+      ' and wanted help with my cart: ' + buildCartMessage() + '.';
+  }
+
+  function buildEngagementMessage(intent) {
+    var storeLabel = getStoreLabel();
+    var category = engagementContext && engagementContext.category;
+    var subject = category
+      ? 'Hi, I was looking at ' + category + ' on ' + storeLabel
+      : 'Hi, I was browsing ' + storeLabel;
+    var suffix = intent === 'suggest'
+      ? ' and wanted a suggestion.'
+      : intent === 'size'
+        ? ' and had a sizing question.'
+        : ' and wanted some help.';
+    return subject + suffix;
   }
 
   // ─────────────────────────────────────────────────────────────────────────────
@@ -510,8 +520,8 @@
       '.cw-card{width:100%;max-width:480px;background:#fff;border-radius:20px 20px 0 0;padding:26px 22px 28px;transform:translateY(100%);animation:cwSlideUp .32s cubic-bezier(.16,1,.3,1) forwards;box-shadow:0 -8px 40px rgba(0,0,0,.18);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;}',
       '@keyframes cwSlideUp{to{transform:translateY(0)}}',
       '.cw-eyebrow{font-size:11px;letter-spacing:.1em;text-transform:uppercase;font-weight:700;margin-bottom:8px;}',
-      '.cw-eyebrow.cw-tier1{color:#145436;}',
-      '.cw-eyebrow.cw-tier2{color:#b23a2e;}',
+       '.cw-eyebrow.cw-exit{color:#145436;}',
+       '.cw-eyebrow.cw-engagement{color:#6c4a2f;}',
       '.cw-title{font-size:18px;font-weight:600;line-height:1.4;margin:0 0 16px;letter-spacing:-.01em;color:#1a1a1a;}',
       '.cw-cart-list{margin-bottom:18px;}',
       '.cw-cart-item{display:flex;align-items:center;gap:12px;background:#faf8f5;border:1px solid #e4dfd8;border-radius:10px;padding:9px 12px;margin-bottom:8px;}',
@@ -520,8 +530,10 @@
       '.cw-item-text{font-size:12.5px;line-height:1.4;color:#1a1a1a;}',
       '.cw-item-text strong{display:block;font-size:13px;}',
       '.cw-btn{display:flex;align-items:center;justify-content:center;gap:10px;width:100%;padding:15px;background:#1f7a4d;color:#fff;border:none;border-radius:10px;font-size:15px;font-weight:600;text-decoration:none;cursor:pointer;margin-bottom:0;}',
-      '#cw-overlay.cw-tier2 .cw-btn{background:#b23a2e;}',
-      '.cw-btn-sms{background:#2b5faa!important;margin-top:9px;}',
+       '.cw-options{display:grid;gap:9px;margin-bottom:14px;}',
+       '.cw-option{width:100%;padding:13px 14px;background:#faf8f5;border:1px solid #d8cfc4;border-radius:10px;color:#2a2723;font-size:14px;font-weight:600;text-align:left;cursor:pointer;}',
+       '.cw-option:hover{border-color:#1f7a4d;background:#f4f8f4;}',
+       '.cw-sms-link{display:block;margin:12px auto 0;color:#49678d;background:none;border:0;font-size:12px;text-decoration:underline;cursor:pointer;}',
       '.cw-btn-icon{width:20px;height:20px;flex-shrink:0;}',
       '.cw-dismiss{display:block;text-align:center;margin-top:14px;font-size:13px;color:#7a7368;background:none;border:none;cursor:pointer;width:100%;padding:6px;}',
       '.cw-consent{font-size:11px;color:#7a7368;text-align:center;margin-top:14px;line-height:1.5;}',
@@ -558,8 +570,9 @@
           '<div class="cw-eyebrow" id="cw-eyebrow">Before you go</div>' +
           '<p class="cw-title" id="cw-title"></p>' +
           '<div class="cw-cart-list" id="cw-cart-list"></div>' +
+          '<div class="cw-options" id="cw-options" style="display:none;"></div>' +
           '<a href="#" id="cw-wa-link" class="cw-btn">' + WA_ICON + 'Continue on WhatsApp</a>' +
-          '<a href="#" id="cw-sms-link" class="cw-btn cw-btn-sms" style="display:none;">' + SMS_ICON + 'Continue via SMS instead</a>' +
+          '<a href="#" id="cw-sms-link" class="cw-sms-link" style="display:none;">Prefer SMS?</a>' +
           '<button class="cw-dismiss" id="cw-dismiss">Not now, I\'ll browse</button>' +
           '<p class="cw-consent" id="cw-consent">Tapping "Continue on WhatsApp" opens a chat with this message pre-filled.</p>' +
         '</div>' +
@@ -569,18 +582,22 @@
     // Dismiss button
     document.getElementById('cw-dismiss').addEventListener('click', function () {
       closeWidget();
-      if (tier1Shown && !tier1Dismissed && !tier2Shown) {
-        tier1Dismissed = true;
-      }
-      // Tier 2 dismiss → stay silent (no state change needed; tier2Shown=true blocks refiring)
     });
 
     // Click on backdrop to dismiss
     document.getElementById('cw-overlay').addEventListener('click', function (e) {
       if (e.target.id === 'cw-overlay') {
         closeWidget();
-        if (tier1Shown && !tier1Dismissed && !tier2Shown) tier1Dismissed = true;
       }
+    });
+
+    document.getElementById('cw-options').addEventListener('click', function (e) {
+      var option = e.target.getAttribute('data-intent');
+      if (!option) return;
+      selectedIntent = option;
+      document.getElementById('cw-options').style.display = 'none';
+      document.getElementById('cw-wa-link').style.display = 'flex';
+      updateMessageLinks();
     });
 
     // WhatsApp link
@@ -596,44 +613,68 @@
     });
   }
 
-  function openWidget(tier) {
+  function updateMessageLinks() {
     var overlay = document.getElementById('cw-overlay');
-    var eyebrow = document.getElementById('cw-eyebrow');
-    var title   = document.getElementById('cw-title');
     var smsLink = document.getElementById('cw-sms-link');
     var waLink  = document.getElementById('cw-wa-link');
-
-    overlay.classList.remove('cw-tier2');
-
     var waNumber  = (config && config.whatsapp_number) || '';
     var smsNumber = (config && config.sms_number) || '';
-
-    if (tier === 1) {
-      eyebrow.textContent = 'Before you go';
-      eyebrow.className = 'cw-eyebrow cw-tier1';
-      title.textContent = hookForCart();
-      waLink.href = 'https://wa.me/' + waNumber + '?text=' + encodeURIComponent(buildMessageText('Hi!'));
-      document.getElementById('cw-consent').textContent = 'Tapping "Continue on WhatsApp" opens a chat with this message pre-filled.';
-    } else {
-      eyebrow.textContent = 'Last thing before you leave';
-      eyebrow.className = 'cw-eyebrow cw-tier2';
-      overlay.classList.add('cw-tier2');
-      title.textContent = 'Want us to hold your cart and send you the details on WhatsApp instead?';
-      waLink.href = 'https://wa.me/' + waNumber + '?text=' + encodeURIComponent(buildMessageText('Hi, I was about to leave \u2014'));
-      document.getElementById('cw-consent').textContent = "We'll just send your cart \u2014 no spam, stop anytime.";
+    var message = activeTrigger === 'exit'
+      ? buildExitMessage()
+      : buildEngagementMessage(selectedIntent);
+    waLink.href = 'https://wa.me/' + waNumber + '?text=' + encodeURIComponent(message);
+    if (activeTrigger === 'engagement' && !selectedIntent) {
+      waLink.style.display = 'none';
+      smsLink.style.display = 'none';
+      return;
     }
-
-    // SMS button: show only if SMS number is configured
     if (smsNumber) {
-      var smsBody = tier === 1
-        ? buildMessageText('Hi!')
-        : buildMessageText('Hi, I was about to leave \u2014');
-      smsLink.href = 'sms:' + smsNumber + '?body=' + encodeURIComponent(smsBody);
-      smsLink.style.display = 'flex';
+      smsLink.href = 'sms:' + smsNumber + '?body=' + encodeURIComponent(message);
+      smsLink.style.display = 'block';
     } else {
       smsLink.style.display = 'none';
     }
+  }
 
+  function openWidget(trigger) {
+    var overlay = document.getElementById('cw-overlay');
+    var eyebrow = document.getElementById('cw-eyebrow');
+    var title = document.getElementById('cw-title');
+    var options = document.getElementById('cw-options');
+    var waLink = document.getElementById('cw-wa-link');
+    var smsLink = document.getElementById('cw-sms-link');
+
+    activeTrigger = trigger;
+    selectedIntent = trigger === 'exit' ? 'help' : null;
+    if (trigger === 'exit') {
+      eyebrow.textContent = 'Before you go';
+      eyebrow.className = 'cw-eyebrow cw-exit';
+      title.textContent = cart.length
+        ? 'Continue on WhatsApp and we\'ll help with your cart.'
+        : 'Need help finding something?';
+      options.style.display = 'none';
+      waLink.style.display = 'flex';
+      document.getElementById('cw-consent').textContent =
+        'Tapping "Continue on WhatsApp" opens a chat with this message pre-filled.';
+    } else {
+      var category = engagementContext && engagementContext.category;
+      eyebrow.textContent = 'A quick question';
+      eyebrow.className = 'cw-eyebrow cw-engagement';
+      title.textContent = 'Hi, I\'m ' + ((config && config.persona_name) || 'Rohan');
+      options.innerHTML = category
+        ? '<button class="cw-option" data-intent="suggest">Suggest something</button>' +
+          '<button class="cw-option" data-intent="size">Size help</button>'
+        : '<button class="cw-option" data-intent="suggest">Suggest something for me</button>' +
+          '<button class="cw-option" data-intent="size">Size help</button>' +
+          '<button class="cw-option" data-intent="other">Something else</button>';
+      options.style.display = 'grid';
+      waLink.style.display = 'none';
+      smsLink.style.display = 'none';
+      document.getElementById('cw-consent').textContent =
+        'Choose one option and we\'ll open WhatsApp with the context pre-filled.';
+    }
+
+    updateMessageLinks();
     document.getElementById('cw-cart-list').innerHTML = buildCartItemsHtml();
     overlay.classList.add('cw-show');
   }
@@ -650,7 +691,7 @@
   // ─────────────────────────────────────────────────────────────────────────────
 
   function postCapture(channel) {
-    var tier = tier2Shown ? 2 : 1;
+    var tier = activeTrigger === 'engagement' ? 2 : 1;
     var snapshot;
     if (cartRaw && Array.isArray(cartRaw.items)) {
       snapshot = {
@@ -691,6 +732,7 @@
     injectRoot();
     initLeaveSignals();
     initCartListener(onCartItemAdded);
+    initEngagementDwell();
   }
 
   fetchConfig(function () {
