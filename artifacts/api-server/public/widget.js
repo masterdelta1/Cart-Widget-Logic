@@ -100,6 +100,7 @@
   // Two trigger constants. Keep these together so engagement behavior is easy
   // to tune without scattering magic numbers through the event handlers.
   var ENGAGEMENT_ADD_TO_CART_THRESHOLD = 2;
+  var ENGAGEMENT_CART_DELAY_MS = 10000;
   var ENGAGEMENT_DWELL_THRESHOLD_SECONDS = 45;
   var SESSION_TRIGGER_KEY = 'cart-to-whatsapp:trigger';
   var ENGAGEMENT_TRIGGER_KEY = 'cart-to-whatsapp:engagement-triggered';
@@ -413,6 +414,7 @@
   var cart = [];           // normalised items (our format)
   var cartRaw = null;      // raw Shopify /cart.js snapshot (for capture POST)
   var converted = false;
+  var cartThresholdTimer = null;
   var activeTrigger = null;
   var engagementContext = null;
   var engagementReason = null;
@@ -424,7 +426,7 @@
 
     if (converted) return;
     if (getCartCount(shopifyCart, normalisedItems) >= ENGAGEMENT_ADD_TO_CART_THRESHOLD) {
-      fireEngagement('cart_threshold');
+      scheduleCartThresholdEngagement();
     }
   }
 
@@ -436,9 +438,23 @@
   }
 
   function fireExitIntent() {
+    if (cartThresholdTimer) {
+      clearTimeout(cartThresholdTimer);
+      cartThresholdTimer = null;
+    }
     if (!claimExit()) return;
     activeTrigger = 'exit';
     openWidget('exit');
+  }
+
+  function scheduleCartThresholdEngagement() {
+    if (cartThresholdTimer || engagementTriggered || converted) return;
+    cartThresholdTimer = setTimeout(function () {
+      cartThresholdTimer = null;
+      if (!engagementTriggered && !converted && !exitTriggered) {
+        fireEngagement('cart_threshold');
+      }
+    }, ENGAGEMENT_CART_DELAY_MS);
   }
 
   function fireEngagement(reason) {
@@ -621,6 +637,10 @@
     }).join('');
   }
 
+  function getCheckoutUrl() {
+    return (script && script.getAttribute('data-checkout-url')) || '/checkout';
+  }
+
   function injectRoot() {
     if (document.getElementById('cw-root')) return;
     var root = document.createElement('div');
@@ -655,6 +675,12 @@
     document.getElementById('cw-options').addEventListener('click', function (e) {
       var option = e.target.getAttribute('data-intent');
       if (!option) return;
+      if (option === 'checkout') {
+        converted = true;
+        closeWidget();
+        window.location.assign(getCheckoutUrl());
+        return;
+      }
       selectedIntent = option;
       document.getElementById('cw-options').style.display = 'none';
       document.getElementById('cw-eyebrow').textContent = 'WhatsApp support';
@@ -734,10 +760,12 @@
         : 'Hi, I\'m ' + persona + '. Can I help you with anything?';
       options.innerHTML = category
         ? '<button class="cw-option" data-intent="suggest">Suggest something</button>' +
-          '<button class="cw-option" data-intent="size">Size help</button>'
+          '<button class="cw-option" data-intent="size">Size help</button>' +
+          '<button class="cw-option" data-intent="checkout">Continue to checkout</button>'
         : '<button class="cw-option" data-intent="suggest">Suggest something for me</button>' +
           '<button class="cw-option" data-intent="size">Size help</button>' +
-          '<button class="cw-option" data-intent="other">Something else</button>';
+          '<button class="cw-option" data-intent="other">Something else</button>' +
+          '<button class="cw-option" data-intent="checkout">Continue to checkout</button>';
       options.style.display = 'grid';
       waLink.style.display = 'none';
       smsLink.style.display = 'none';
