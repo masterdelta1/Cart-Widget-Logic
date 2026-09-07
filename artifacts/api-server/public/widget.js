@@ -102,17 +102,35 @@
   var ENGAGEMENT_ADD_TO_CART_THRESHOLD = 2;
   var ENGAGEMENT_DWELL_THRESHOLD_SECONDS = 45;
   var SESSION_TRIGGER_KEY = 'cart-to-whatsapp:trigger';
-  var sessionTrigger = null;
+  var ENGAGEMENT_TRIGGER_KEY = 'cart-to-whatsapp:engagement-triggered';
+  var EXIT_TRIGGER_KEY = 'cart-to-whatsapp:exit-triggered';
+  var engagementTriggered = false;
+  var exitTriggered = false;
 
   try {
-    sessionTrigger = window.sessionStorage.getItem(SESSION_TRIGGER_KEY) || null;
+    var legacyTrigger = window.sessionStorage.getItem(SESSION_TRIGGER_KEY);
+    engagementTriggered =
+      window.sessionStorage.getItem(ENGAGEMENT_TRIGGER_KEY) === '1' ||
+      legacyTrigger === 'engagement';
+    exitTriggered =
+      window.sessionStorage.getItem(EXIT_TRIGGER_KEY) === '1' ||
+      legacyTrigger === 'exit';
   } catch (_) {}
 
-  function claimTrigger(trigger) {
-    if (sessionTrigger || converted) return false;
-    sessionTrigger = trigger;
+  function claimEngagement() {
+    if (engagementTriggered || converted) return false;
+    engagementTriggered = true;
     try {
-      window.sessionStorage.setItem(SESSION_TRIGGER_KEY, trigger);
+      window.sessionStorage.setItem(ENGAGEMENT_TRIGGER_KEY, '1');
+    } catch (_) {}
+    return true;
+  }
+
+  function claimExit() {
+    if (exitTriggered || converted) return false;
+    exitTriggered = true;
+    try {
+      window.sessionStorage.setItem(EXIT_TRIGGER_KEY, '1');
     } catch (_) {}
     return true;
   }
@@ -418,13 +436,13 @@
   }
 
   function fireExitIntent() {
-    if (!claimTrigger('exit')) return;
+    if (!claimExit()) return;
     activeTrigger = 'exit';
     openWidget('exit');
   }
 
   function fireEngagement(reason) {
-    if (!claimTrigger('engagement')) return;
+    if (!claimEngagement()) return;
     activeTrigger = 'engagement';
     engagementReason = reason || 'dwell';
     engagementContext = getPageContext();
@@ -438,8 +456,20 @@
 
   function initLeaveSignals() {
     // Tab / app switch is the mobile equivalent of leaving the page.
+    var hiddenExitTimer = null;
     document.addEventListener('visibilitychange', function () {
-      if (document.hidden) fireExitIntent();
+      if (hiddenExitTimer) {
+        clearTimeout(hiddenExitTimer);
+        hiddenExitTimer = null;
+      }
+      if (document.hidden) {
+        // Mobile back navigation can emit visibilitychange just before
+        // popstate. Give the history trap a chance to intercept first.
+        hiddenExitTimer = setTimeout(function () {
+          if (document.hidden) fireExitIntent();
+          hiddenExitTimer = null;
+        }, 250);
+      }
     });
 
     // Desktop mouse exit toward the browser chrome.
@@ -458,7 +488,7 @@
       touchStartY = touchStartX === null ? null : touch.clientY;
     }, { passive: true });
     document.addEventListener('touchmove', function (e) {
-      if (touchStartX === null || sessionTrigger || converted) return;
+      if (touchStartX === null || exitTriggered || converted) return;
       var touch = e.changedTouches && e.changedTouches[0];
       if (!touch) return;
       var dx = touch.clientX - touchStartX;
@@ -483,7 +513,7 @@
     } catch (_) {}
 
     window.addEventListener('popstate', function () {
-      if (!sessionTrigger && !converted) {
+      if (!exitTriggered && !converted) {
         fireExitIntent();
         try { history.pushState({ _cwTrap: true }, '', location.href); } catch (_) {}
       }
@@ -493,7 +523,7 @@
   function initEngagementDwell() {
     setTimeout(function () {
       var pageContext = getPageContext();
-      if (!sessionTrigger && !converted && pageContext.isProductOrCollectionPage) {
+      if (!engagementTriggered && !converted && pageContext.isProductOrCollectionPage) {
         fireEngagement('dwell');
       }
     }, ENGAGEMENT_DWELL_THRESHOLD_SECONDS * 1000);

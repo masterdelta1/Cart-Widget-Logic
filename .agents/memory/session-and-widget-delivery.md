@@ -15,11 +15,11 @@ Custom storefronts must explicitly forward their framework cart state to the wid
 
 Cart snapshots need an explicit price-unit marker: Shopify `/cart.js` totals are minor units, while custom bridge totals are major currency units. Dashboard formatting should honor the marker and infer legacy custom shapes only when the marker is absent.
 
-The widget's trigger model is first-trigger-wins within browser sessionStorage: exit intent handles all carts, while engagement handles the configured add-to-cart threshold or product/collection dwell and can never fire after exit.
+The widget tracks engagement and exit independently in browser sessionStorage: engagement fires once from its threshold/dwell rules, while exit can still fire once later when the shopper leaves.
 
-**Why:** Overlapping idle, cart, and exit signals made behavior unpredictable and produced competing popups; a single session lock keeps the handoff deterministic.
+**Why:** Engagement must not suppress the later exit-recovery opportunity; each trigger needs its own once-per-session lock.
 
-**How to apply:** Keep exit detection and engagement detection separate, but route both through one session-scoped claim before rendering any popup.
+**How to apply:** Keep separate engagement and exit session keys, and keep the mobile history trap active until the exit trigger has been shown.
 
 Persona text is merchant-configurable through the store settings and widget config, with “Rohan” as the database/UI default.
 
