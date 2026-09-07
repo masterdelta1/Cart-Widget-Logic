@@ -1,0 +1,124 @@
+# Replit Build Prompt — Two-Trigger Popup System
+
+Paste everything below into Replit's AI / agent.
+
+---
+
+## Context
+
+I have an existing Shopify cart-recovery widget (Express + Drizzle ORM +
+Supabase Auth + esbuild backend, React frontend, deployed as a client-side
+script snippet merchants paste into their theme). It currently has multiple
+overlapping triggers: idle timer, exit-intent via History API, tab-switch,
+and mouse-exit, each firing a similar generic "you're leaving, here's a
+discount" popup.
+
+I want to replace that trigger sprawl with exactly two clean, distinct
+triggers. No catalog pipeline, no order-history/"bought together" data, no
+on-site chat, no LLM calls anywhere in this feature. Keep it strictly
+"paste the snippet and it works" — zero merchant configuration beyond
+what already exists today.
+
+## Trigger 1 — Exit Intent (always fires)
+
+Detect: mouse-exit toward the top of viewport (desktop) OR back-button/tab-
+switch equivalent on mobile — reuse whatever exit-intent detection already
+exists in the codebase, just consolidate it into one trigger instead of
+several overlapping ones.
+
+Behavior:
+- If cart has items → show "Continue on WhatsApp" popup with a wa.me
+  link, message pre-filled with the actual cart contents (product names,
+  quantities) pulled from the existing cart API call.
+- If cart is empty → show "Continue on WhatsApp" popup with a generic
+  pre-filled message like "Hi, I was checking out [store name] and wanted
+  some help finding something."
+- One popup, one button, no branching UI, no secondary CTA competing with
+  it. Keep SMS (if it currently exists as a co-equal option) as a small
+  text-link fallback under the WhatsApp button, not equal visual weight.
+- This trigger should fire at most once per session.
+
+## Trigger 2 — Engagement (persona popup, not an exit signal)
+
+Fires while the shopper is actively browsing, before any exit intent.
+Name it "Hi, I'm Rohan" (or pull a configurable persona name/brand
+placeholder — make this a config value per merchant later, hardcode
+"Rohan" as default for now).
+
+Fire condition (implement as simple, tunable config constants, not
+hardcoded magic numbers inline):
+- `ENGAGEMENT_ADD_TO_CART_THRESHOLD = 2` (fires once the shopper has
+  added 2+ items to cart in the current session), OR
+- `ENGAGEMENT_DWELL_THRESHOLD_SECONDS = 45` (fires once the shopper has
+  spent 45+ seconds on a single product or collection page without
+  either trigger already firing)
+- Whichever condition is met first fires the popup. Only fires once per
+  session. Never fires if Trigger 1 has already fired this session.
+
+Content logic — based only on current page context, no product data
+lookups beyond what's already available client-side:
+- If on a product or collection page: read the Shopify product type /
+  collection handle (already exposed client-side via
+  `window.ShopifyAnalytics` / theme Liquid object / meta tags — use
+  whatever's cheapest to read without new merchant setup) and phrase the
+  popup around that category. Example: "Looking at jeans — want a
+  suggestion, or help with sizing?" with two tappable options: "Suggest
+  something" and "Size help."
+- If on homepage or a page with no clear single category (browsing
+  broadly): show a 3-option menu, exact wording locked as:
+  1. "Suggest something for me"
+  2. "Size help"
+  3. "Something else"
+
+Selecting any option does NOT trigger any on-site resolution — no size
+chart display, no product card, no inline content. It only tags the
+selected intent into the outgoing WhatsApp pre-filled message and then
+shows the same "Continue on WhatsApp" CTA as Trigger 1, with that context
+appended. Example pre-fill: "Hi, I was looking at jeans on [store name]
+and wanted a suggestion" or "...and had a sizing question."
+
+## Explicitly out of scope — do not build any of this
+
+- No product catalog ingestion or storage
+- No "customers who bought X also bought Y" logic
+- No inline size chart rendering
+- No add-to-cart button inside the popup
+- No chat/conversation UI, no free-text input, no LLM calls
+- No merchant-side configuration UI beyond persona name (optional, can
+  default to "Rohan" / static text for v1)
+
+The human on WhatsApp handles everything past the pre-filled message —
+this system's only job is: detect the moment, phrase one line correctly,
+and hand off with context.
+
+## Technical notes
+
+- Both triggers should share the same script tag / bundle as the current
+  widget — no separate install step for merchants.
+- Keep both triggers mutually exclusive within a session (don't fire
+  Trigger 2 after Trigger 1, or vice versa, in the same session).
+- Cart contents: reuse the existing Shopify cart API integration already
+  in the codebase.
+- Category detection: use whatever Shopify theme data is already
+  reachable client-side without requiring merchant setup; fall back to
+  the homepage 3-option menu if category can't be reliably determined.
+- Please also flag and fix the known session-cookie persistence bug
+  (Express not trusting the proxy layer — needs `trust proxy` set
+  correctly, likely a Supabase Auth cookie `secure`/`sameSite` config
+  issue behind Google's proxy) while touching this part of the codebase,
+  since it affects session-scoped trigger state.
+
+## Acceptance criteria
+
+- [ ] Old idle-timer/multiple-overlapping-trigger logic removed or
+      consolidated into these two triggers only
+- [ ] Trigger 1 fires on exit intent, correctly branches on cart
+      empty/non-empty, pre-fills WhatsApp message accordingly
+- [ ] Trigger 2 fires on add-to-cart or dwell threshold (config values,
+      not magic numbers), never fires after Trigger 1 has fired
+- [ ] Trigger 2 content branches correctly on category page vs.
+      homepage/no-category
+- [ ] Selected intent option is correctly appended to the WhatsApp
+      pre-fill message
+- [ ] No new backend catalog storage, no LLM/chat dependencies added
+- [ ] Existing script-snippet install flow for merchants is unchanged
