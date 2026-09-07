@@ -43,6 +43,7 @@ export interface Store {
   store_domain: string;
   whatsapp_number?: string | null;
   sms_number?: string | null;
+  persona_name: string;
   mode: StoreMode;
   discount_amount?: number | null;
   currency: string;
@@ -55,6 +56,7 @@ export interface Store {
 export interface StoreConfig {
   whatsapp_number?: string | null;
   sms_number?: string | null;
+  persona_name: string;
   mode: StoreMode;
   discount_amount?: number | null;
   currency: string;
@@ -65,6 +67,7 @@ export interface CreateStoreBody {
   store_domain: string;
   whatsapp_number: string;
   sms_number?: string | null;
+  persona_name?: string;
   mode: StoreMode;
   discount_amount?: number | null;
   currency?: string;
@@ -76,6 +79,7 @@ export interface UpdateStoreBody {
   mode?: StoreMode;
   discount_amount?: number | null;
   currency?: string;
+  persona_name?: string;
 }
 
 export type CaptureChannel = typeof CaptureChannel[keyof typeof CaptureChannel];

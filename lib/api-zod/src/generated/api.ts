@@ -31,12 +31,15 @@ export const SignupBody = zod.object({
   "store_domain": zod.string()
 })
 
+export const signupResponsePersonaNameDefault = `Rohan`;
+
 export const SignupResponse = zod.object({
   "id": zod.uuid(),
   "owner_email": zod.email(),
   "store_domain": zod.string(),
   "whatsapp_number": zod.string().nullish(),
   "sms_number": zod.string().nullish(),
+  "persona_name": zod.string().default(signupResponsePersonaNameDefault),
   "mode": zod.enum(['personalized', 'discount']),
   "discount_amount": zod.int().nullish(),
   "currency": zod.string(),
@@ -52,12 +55,15 @@ export const LoginBody = zod.object({
   "password": zod.string()
 })
 
+export const loginResponsePersonaNameDefault = `Rohan`;
+
 export const LoginResponse = zod.object({
   "id": zod.uuid(),
   "owner_email": zod.email(),
   "store_domain": zod.string(),
   "whatsapp_number": zod.string().nullish(),
   "sms_number": zod.string().nullish(),
+  "persona_name": zod.string().default(loginResponsePersonaNameDefault),
   "mode": zod.enum(['personalized', 'discount']),
   "discount_amount": zod.int().nullish(),
   "currency": zod.string(),
@@ -76,12 +82,15 @@ export const LogoutResponse = zod.object({
 /**
  * @summary Get the logged-in store owner
  */
+export const getCurrentUserResponsePersonaNameDefault = `Rohan`;
+
 export const GetCurrentUserResponse = zod.object({
   "id": zod.uuid(),
   "owner_email": zod.email(),
   "store_domain": zod.string(),
   "whatsapp_number": zod.string().nullish(),
   "sms_number": zod.string().nullish(),
+  "persona_name": zod.string().default(getCurrentUserResponsePersonaNameDefault),
   "mode": zod.enum(['personalized', 'discount']),
   "discount_amount": zod.int().nullish(),
   "currency": zod.string(),
@@ -93,17 +102,18 @@ export const GetCurrentUserResponse = zod.object({
  * Creates a store record on signup. Returns the store including its UUID which acts as the install token for the widget snippet.
  * @summary Create a new store
  */
-export const createStoreBodyCurrencyDefault = `\u20B9`;
-
 export const CreateStoreBody = zod.object({
   "owner_email": zod.email(),
   "store_domain": zod.string(),
   "whatsapp_number": zod.string(),
   "sms_number": zod.string().nullish(),
+  "persona_name": zod.string().optional(),
   "mode": zod.enum(['personalized', 'discount']),
   "discount_amount": zod.int().nullish(),
-  "currency": zod.string().default(createStoreBodyCurrencyDefault)
+  "currency": zod.string().optional()
 })
+
+export const createStoreResponsePersonaNameDefault = `Rohan`;
 
 export const CreateStoreResponse = zod.object({
   "id": zod.uuid(),
@@ -111,6 +121,7 @@ export const CreateStoreResponse = zod.object({
   "store_domain": zod.string(),
   "whatsapp_number": zod.string().nullish(),
   "sms_number": zod.string().nullish(),
+  "persona_name": zod.string().default(createStoreResponsePersonaNameDefault),
   "mode": zod.enum(['personalized', 'discount']),
   "discount_amount": zod.int().nullish(),
   "currency": zod.string(),
@@ -129,6 +140,7 @@ export const GetStoreConfigParams = zod.object({
 export const GetStoreConfigResponse = zod.object({
   "whatsapp_number": zod.string().nullish(),
   "sms_number": zod.string().nullish(),
+  "persona_name": zod.string(),
   "mode": zod.enum(['personalized', 'discount']),
   "discount_amount": zod.int().nullish(),
   "currency": zod.string()
@@ -148,8 +160,11 @@ export const UpdateStoreBody = zod.object({
   "sms_number": zod.string().nullish(),
   "mode": zod.enum(['personalized', 'discount']).optional(),
   "discount_amount": zod.int().nullish(),
-  "currency": zod.string().optional()
+  "currency": zod.string().optional(),
+  "persona_name": zod.string().optional()
 })
+
+export const updateStoreResponsePersonaNameDefault = `Rohan`;
 
 export const UpdateStoreResponse = zod.object({
   "id": zod.uuid(),
@@ -157,6 +172,7 @@ export const UpdateStoreResponse = zod.object({
   "store_domain": zod.string(),
   "whatsapp_number": zod.string().nullish(),
   "sms_number": zod.string().nullish(),
+  "persona_name": zod.string().default(updateStoreResponsePersonaNameDefault),
   "mode": zod.enum(['personalized', 'discount']),
   "discount_amount": zod.int().nullish(),
   "currency": zod.string(),

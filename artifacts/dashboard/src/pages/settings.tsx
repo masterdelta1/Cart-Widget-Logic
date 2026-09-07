@@ -39,6 +39,7 @@ import { Skeleton } from "@/components/ui/skeleton"
 const settingsSchema = z.object({
   whatsapp_number: z.string().min(1, { message: "WhatsApp number is required." }),
   sms_number: z.string().optional().nullable(),
+  persona_name: z.string().trim().min(1, { message: "Persona name is required." }).max(50, { message: "Persona name must be 50 characters or fewer." }),
   mode: z.enum(["personalized", "discount"]),
   discount_amount: z.coerce.number().optional().nullable(),
 })
@@ -54,6 +55,7 @@ export default function Settings() {
     defaultValues: {
       whatsapp_number: "",
       sms_number: "",
+      persona_name: "Rohan",
       mode: "personalized",
       discount_amount: null,
     },
@@ -70,6 +72,7 @@ export default function Settings() {
       form.reset({
         whatsapp_number: store.whatsapp_number || "",
         sms_number: store.sms_number || "",
+        persona_name: store.persona_name || "Rohan",
         mode: store.mode,
         discount_amount: store.discount_amount,
       })
@@ -197,7 +200,7 @@ export default function Settings() {
             </CardHeader>
             <CardContent className="space-y-6">
               
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <FormField
                   control={form.control}
                   name="whatsapp_number"
@@ -222,6 +225,20 @@ export default function Settings() {
                         <Input placeholder="+1234567890" {...field} value={field.value || ""} />
                       </FormControl>
                       <FormDescription>Fallback channel if WhatsApp fails</FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="persona_name"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Assistant Name</FormLabel>
+                      <FormControl>
+                        <Input placeholder="Rohan" {...field} />
+                      </FormControl>
+                      <FormDescription>Name shoppers will see in the engagement popup.</FormDescription>
                       <FormMessage />
                     </FormItem>
                   )}

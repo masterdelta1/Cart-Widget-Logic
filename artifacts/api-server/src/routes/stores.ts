@@ -35,6 +35,7 @@ router.post("/stores", async (req, res): Promise<void> => {
       storeDomain: data.store_domain,
       whatsappNumber: data.whatsapp_number,
       smsNumber: data.sms_number ?? null,
+      personaName: data.persona_name ?? "Rohan",
       mode: data.mode,
       discountAmount: data.discount_amount ?? null,
       currency: data.currency ?? "₹",
@@ -48,6 +49,7 @@ router.post("/stores", async (req, res): Promise<void> => {
       store_domain: store.storeDomain,
       whatsapp_number: store.whatsappNumber,
       sms_number: store.smsNumber,
+      persona_name: store.personaName,
       mode: store.mode,
       discount_amount: store.discountAmount,
       currency: store.currency,
@@ -81,6 +83,7 @@ router.get("/stores/:id/config", async (req, res): Promise<void> => {
     GetStoreConfigResponse.parse({
       whatsapp_number: store.whatsappNumber,
       sms_number: store.smsNumber,
+      persona_name: store.personaName,
       mode: store.mode,
       discount_amount: store.discountAmount,
       currency: store.currency,
@@ -110,6 +113,7 @@ router.patch("/stores/:id", requireAuth, requireOwnStore, async (req, res): Prom
   if (data.whatsapp_number !== undefined)
     updatePayload.whatsappNumber = data.whatsapp_number;
   if (data.sms_number !== undefined) updatePayload.smsNumber = data.sms_number;
+  if (data.persona_name !== undefined) updatePayload.personaName = data.persona_name;
   if (data.mode !== undefined) updatePayload.mode = data.mode;
   if (data.discount_amount !== undefined)
     updatePayload.discountAmount = data.discount_amount;
@@ -133,6 +137,7 @@ router.patch("/stores/:id", requireAuth, requireOwnStore, async (req, res): Prom
       store_domain: store.storeDomain,
       whatsapp_number: store.whatsappNumber,
       sms_number: store.smsNumber,
+      persona_name: store.personaName,
       mode: store.mode,
       discount_amount: store.discountAmount,
       currency: store.currency,

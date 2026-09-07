@@ -18,6 +18,7 @@ export const storesTable = pgTable("stores", {
   storeDomain: text("store_domain").notNull(),
   whatsappNumber: text("whatsapp_number"),
   smsNumber: text("sms_number"),
+  personaName: text("persona_name").notNull().default("Rohan"),
   mode: storeModeEnum("mode").notNull().default("personalized"),
   discountAmount: integer("discount_amount"),
   currency: text("currency").notNull().default("₹"),

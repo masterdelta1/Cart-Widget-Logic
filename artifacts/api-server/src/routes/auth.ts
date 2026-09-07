@@ -21,6 +21,7 @@ function toStoreResponse(store: typeof storesTable.$inferSelect) {
     store_domain: store.storeDomain,
     whatsapp_number: store.whatsappNumber,
     sms_number: store.smsNumber,
+    persona_name: store.personaName,
     mode: store.mode,
     discount_amount: store.discountAmount,
     currency: store.currency,

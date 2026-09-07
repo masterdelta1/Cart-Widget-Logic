@@ -13,6 +13,7 @@ import type { StoreMode } from './storeMode';
 export interface StoreConfig {
   whatsapp_number?: string | null;
   sms_number?: string | null;
+  persona_name: string;
   mode: StoreMode;
   discount_amount?: number | null;
   currency: string;

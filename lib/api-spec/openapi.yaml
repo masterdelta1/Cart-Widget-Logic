@@ -353,6 +353,9 @@ components:
         sms_number:
           type: string
           nullable: true
+        persona_name:
+          type: string
+          default: "Rohan"
         mode:
           $ref: "#/components/schemas/StoreMode"
         discount_amount:
@@ -369,6 +372,7 @@ components:
         - store_domain
         - mode
         - currency
+        - persona_name
         - created_at
 
     StoreConfig:
@@ -381,6 +385,8 @@ components:
         sms_number:
           type: string
           nullable: true
+        persona_name:
+          type: string
         mode:
           $ref: "#/components/schemas/StoreMode"
         discount_amount:
@@ -391,6 +397,7 @@ components:
       required:
         - mode
         - currency
+        - persona_name
 
     CreateStoreBody:
       type: object
@@ -405,6 +412,8 @@ components:
         sms_number:
           type: string
           nullable: true
+        persona_name:
+          type: string
         mode:
           $ref: "#/components/schemas/StoreMode"
         discount_amount:
@@ -412,7 +421,6 @@ components:
           nullable: true
         currency:
           type: string
-          default: "₹"
       required:
         - owner_email
         - store_domain
@@ -433,6 +441,8 @@ components:
           type: integer
           nullable: true
         currency:
+          type: string
+        persona_name:
           type: string
 
     CaptureChannel:

@@ -20,3 +20,9 @@ The widget's trigger model is first-trigger-wins within browser sessionStorage: 
 **Why:** Overlapping idle, cart, and exit signals made behavior unpredictable and produced competing popups; a single session lock keeps the handoff deterministic.
 
 **How to apply:** Keep exit detection and engagement detection separate, but route both through one session-scoped claim before rendering any popup.
+
+Persona text is merchant-configurable through the store settings and widget config, with “Rohan” as the database/UI default.
+
+**Why:** The engagement popup is shopper-facing brand voice, so it cannot remain hardcoded in the delivered script.
+
+**How to apply:** Persist the persona alongside store messaging settings and let the widget fall back to the default only for legacy or missing config.

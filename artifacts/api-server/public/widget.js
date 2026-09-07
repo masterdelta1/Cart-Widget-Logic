@@ -397,6 +397,7 @@
   var converted = false;
   var activeTrigger = null;
   var engagementContext = null;
+  var engagementReason = null;
   var selectedIntent = null;
 
   function onCartItemAdded(normalisedItems, shopifyCart) {
@@ -405,7 +406,7 @@
 
     if (converted) return;
     if (getCartCount(shopifyCart, normalisedItems) >= ENGAGEMENT_ADD_TO_CART_THRESHOLD) {
-      fireEngagement();
+      fireEngagement('cart_threshold');
     }
   }
 
@@ -422,9 +423,10 @@
     openWidget('exit');
   }
 
-  function fireEngagement() {
+  function fireEngagement(reason) {
     if (!claimTrigger('engagement')) return;
     activeTrigger = 'engagement';
+    engagementReason = reason || 'dwell';
     engagementContext = getPageContext();
     openWidget('engagement');
   }
@@ -445,6 +447,35 @@
       if (!e.relatedTarget && e.clientY <= 0) fireExitIntent();
     });
 
+    // Edge-back gestures can begin navigating before popstate reaches the
+    // page. Claim exit intent as soon as a rightward swipe starts at the edge.
+    var touchStartX = null;
+    var touchStartY = null;
+    document.addEventListener('touchstart', function (e) {
+      var touch = e.changedTouches && e.changedTouches[0];
+      if (!touch) return;
+      touchStartX = touch.clientX <= 32 ? touch.clientX : null;
+      touchStartY = touchStartX === null ? null : touch.clientY;
+    }, { passive: true });
+    document.addEventListener('touchmove', function (e) {
+      if (touchStartX === null || sessionTrigger || converted) return;
+      var touch = e.changedTouches && e.changedTouches[0];
+      if (!touch) return;
+      var dx = touch.clientX - touchStartX;
+      var dy = Math.abs(touch.clientY - touchStartY);
+      if (dx >= 45 && dy < 80) {
+        if (e.cancelable) e.preventDefault();
+        fireExitIntent();
+        try { history.pushState({ _cwTrap: true }, '', location.href); } catch (_) {}
+        touchStartX = null;
+        touchStartY = null;
+      }
+    }, { passive: false });
+    document.addEventListener('touchend', function () {
+      touchStartX = null;
+      touchStartY = null;
+    }, { passive: true });
+
     // Back button / back-swipe: push a trap history entry so the first
     // "back" action fires popstate instead of actually navigating away.
     try {
@@ -463,7 +494,7 @@
     setTimeout(function () {
       var pageContext = getPageContext();
       if (!sessionTrigger && !converted && pageContext.isProductOrCollectionPage) {
-        fireEngagement();
+        fireEngagement('dwell');
       }
     }, ENGAGEMENT_DWELL_THRESHOLD_SECONDS * 1000);
   }
@@ -596,7 +627,11 @@
       if (!option) return;
       selectedIntent = option;
       document.getElementById('cw-options').style.display = 'none';
+      document.getElementById('cw-eyebrow').textContent = 'WhatsApp support';
+      document.getElementById('cw-title').textContent = 'Continue to chat with our expert';
       document.getElementById('cw-wa-link').style.display = 'flex';
+      document.getElementById('cw-consent').textContent =
+        'Your choice will be included in the WhatsApp message.';
       updateMessageLinks();
     });
 
@@ -658,9 +693,15 @@
         'Tapping "Continue on WhatsApp" opens a chat with this message pre-filled.';
     } else {
       var category = engagementContext && engagementContext.category;
-      eyebrow.textContent = 'A quick question';
+      var persona = (config && config.persona_name) || 'Rohan';
+      var cartCount = getCartCount(cartRaw, cart);
       eyebrow.className = 'cw-eyebrow cw-engagement';
-      title.textContent = 'Hi, I\'m ' + ((config && config.persona_name) || 'Rohan');
+      eyebrow.textContent = 'Here to help';
+      title.textContent = engagementReason === 'cart_threshold'
+        ? 'Hi, I\'m ' + persona + '. You have added ' + cartCount +
+          ' ' + (cartCount === 1 ? 'product' : 'products') +
+          ' to your cart. Can I help you with anything?'
+        : 'Hi, I\'m ' + persona + '. Can I help you with anything?';
       options.innerHTML = category
         ? '<button class="cw-option" data-intent="suggest">Suggest something</button>' +
           '<button class="cw-option" data-intent="size">Size help</button>'

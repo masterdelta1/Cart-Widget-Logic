@@ -13,4 +13,5 @@ export interface UpdateStoreBody {
   mode?: StoreMode;
   discount_amount?: number | null;
   currency?: string;
+  persona_name?: string;
 }
