@@ -102,6 +102,7 @@
   var ENGAGEMENT_ADD_TO_CART_THRESHOLD = 2;
   var ENGAGEMENT_CART_DELAY_MS = 10000;
   var ENGAGEMENT_DWELL_THRESHOLD_SECONDS = 45;
+  var VISITOR_ID_KEY = 'cart-to-whatsapp:visitor-id';
   var SESSION_TRIGGER_KEY = 'cart-to-whatsapp:trigger';
   var ENGAGEMENT_TRIGGER_KEY = 'cart-to-whatsapp:engagement-triggered';
   var EXIT_TRIGGER_KEY = 'cart-to-whatsapp:exit-triggered';
@@ -694,12 +695,14 @@
     // WhatsApp link
     document.getElementById('cw-wa-link').addEventListener('click', function () {
       converted = true;
+      postEvent('clicked', activeTrigger);
       postCapture('whatsapp');
     });
 
     // SMS link
     document.getElementById('cw-sms-link').addEventListener('click', function () {
       converted = true;
+      postEvent('clicked', activeTrigger);
       postCapture('sms');
     });
   }
@@ -736,6 +739,7 @@
     var smsLink = document.getElementById('cw-sms-link');
 
     activeTrigger = trigger;
+    postEvent('shown', trigger);
     selectedIntent = trigger === 'exit' ? 'help' : null;
     if (trigger === 'exit') {
       eyebrow.textContent = 'Before you go';
@@ -781,6 +785,7 @@
   function closeWidget() {
     var overlay = document.getElementById('cw-overlay');
     if (overlay) overlay.classList.remove('cw-show');
+    if (!converted) postEvent('dismissed', activeTrigger);
   }
 
   // ─────────────────────────────────────────────────────────────────────────────
@@ -788,6 +793,36 @@
   // Posts to POST /api/captures on WhatsApp or SMS click.
   // cart_snapshot is the raw /cart.js response at time of conversion.
   // ─────────────────────────────────────────────────────────────────────────────
+
+  function getVisitorId() {
+    try {
+      var id = window.sessionStorage.getItem(VISITOR_ID_KEY);
+      if (!id) {
+        id = 'v_' + Date.now() + '_' + Math.random().toString(36).slice(2);
+        window.sessionStorage.setItem(VISITOR_ID_KEY, id);
+      }
+      return id;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  function postEvent(eventType, trigger, orderValue) {
+    var visitorId = getVisitorId();
+    if (!visitorId) return;
+    fetch(API_BASE + '/events', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'same-origin',
+      body: JSON.stringify({
+        store_id: storeId,
+        session_id: visitorId,
+        trigger: trigger || null,
+        event_type: eventType,
+        order_value: orderValue || null,
+      }),
+    }).catch(function () {});
+  }
 
   function postCapture(channel) {
     var tier = activeTrigger === 'engagement' ? 2 : 1;
